@@ -1,7 +1,11 @@
 <?php
 
+use App\Http\Controllers\CountryController;
+use App\Http\Controllers\FilmController;
+use App\Http\Controllers\GenreController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\AuthController;
 
 /*
 |--------------------------------------------------------------------------
@@ -16,4 +20,30 @@ use Illuminate\Support\Facades\Route;
 
 Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
     return $request->user();
+});
+
+Route::prefix('auth')->group(function () {
+    Route::post('/sign-up', [AuthController::class, 'register'])->name('api_sign-up');
+    Route::post('/login', [AuthController::class, 'login'])->name('api_login');
+    Route::middleware('auth:sanctum')->post('/logout', [AuthController::class,'logout'])->name('api_logout');
+});
+
+Route::prefix('film')->group(function () {
+    Route::get('/detail', [FilmController::class, 'getFilmDetail'])->name('api_film_detail');
+    Route::get('/latest', [FilmController::class, 'getLatestFilm'])->name('api_latest_film');
+    Route::get('/series', [FilmController::class, 'getSeriesFilms'])->name('api_series_film');
+    Route::get('/movies', [FilmController::class, 'getMovieFilms'])->name('api_movies_film');
+    Route::get('/search', [FilmController::class,'getFilmBySearch'])->name('api_search_film');
+    Route::get('/genre/{slug}', [FilmController::class,'getFilmByGenre'])->name('api_genre_film');
+    Route::get('/country/{slug}', [FilmController::class,'getFilmByCountry'])->name('api_country_film');
+});
+
+Route::prefix('genre')->group(function () {
+    Route::get('/', [GenreController::class, 'getAllGenres'])->name('api_list_genre');
+    Route::get('/{slug}', [GenreController::class,'getGenreDetail'])->name('api_genre_detail');
+});
+
+Route::prefix('country')->group(function () {
+    Route::get('/', [CountryController::class, 'getAllCountries'])->name('api_list_country');
+    Route::get('/{slug}', [CountryController::class, 'getCountryDetail'])->name('api_country_detail');
 });
