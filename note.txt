@@ -1,0 +1,1 @@
+Run index for table films: -  ALTER TABLE films ADD FULLTEXT(name, origin_name);

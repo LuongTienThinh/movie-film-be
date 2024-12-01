@@ -21,7 +21,7 @@ return new class extends Migration
             $table->string('poster_url');
             $table->string('thumbnail_url');
             $table->string('trailer_url');
-            $table->string('time');
+            $table->string('time')->nullable();
             $table->integer('episode_current');
             $table->integer('episode_total');
             $table->integer('year');
