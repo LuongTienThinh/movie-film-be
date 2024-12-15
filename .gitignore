@@ -1,5 +1,6 @@
 /.phpunit.cache
 /node_modules
+/public/uploads
 /public/build
 /public/hot
 /public/storage
@@ -17,3 +18,5 @@ yarn-error.log
 /.idea
 /.vscode
 /data
+.htaccess
+index.php

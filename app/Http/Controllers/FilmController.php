@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Models\Episode;
 use App\Models\Film;
+use App\Models\User;
+use App\Models\UserFilm;
 use App\Traits\ApiResponseTrait;
 use Exception;
 use Illuminate\Database\Eloquent\Builder;
@@ -114,11 +116,50 @@ class FilmController extends Controller
         }
     }
 
-    private function getApiFilm(Request $request, Builder $films)
+    public function getWishlistById(Request $request, int $userId)
+    {
+        try {
+            $films = User::find($userId)->films()->getQuery();
+
+            $data = $this->getApiFilm($request, $films, 'user_film');
+
+            return $this->successResponse($data, 200, "Get user wishlist films success.");
+        } catch (Exception $e) {
+            return $this->errorResponse(500, $e->getMessage());
+        }
+    }
+
+    public function saveUserFilm(Request $request, int $userId, int $filmId)
+    {
+        try {
+            $viewed = $request->input('viewed', false);
+            $followed = $request->input('followed', false);
+
+            $userFilm = UserFilm::query()->where('user_id', $userId)->where('film_id', $filmId)->first();
+
+            if (!$userFilm) {
+                $userFilm = UserFilm::create([
+                    'user_id' => $userId,
+                    'film_id' => $filmId,
+                ]);
+            }
+
+            $userFilm->is_view = $viewed;
+            $userFilm->is_follow = $followed;
+
+            $userFilm->save();
+
+            return $this->successResponse($userFilm, 200, "Save user film success.");
+        } catch (Exception $e) {
+            return $this->errorResponse(500, $e->getMessage());
+        }
+    }
+
+    private function getApiFilm(Request $request, Builder $films, string $tableName = 'films')
     {
         $pagination = $this->getPageManage($request, $films->count());
 
-        $listFilms = $films->orderByDesc("updated_at")
+        $listFilms = $films->orderByDesc("$tableName.updated_at")
             ->skip(($pagination["currentPage"] - 1) * $pagination["perPage"])
             ->take($pagination["perPage"])
             ->get();
@@ -147,7 +188,6 @@ class FilmController extends Controller
 
     private function getPageManage(Request $request, int $totalItem)
     {
-        error_log("1. {$request->page}");
         $page = intval($request->page);
         $perPage = intval($request->perPage) | 8;
         $totalPage = ceil($totalItem / $perPage);

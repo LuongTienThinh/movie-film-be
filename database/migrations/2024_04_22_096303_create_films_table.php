@@ -33,6 +33,8 @@ return new class extends Migration
             $table->foreign('type_id')->references('id')->on('types');
             $table->foreign('status_id')->references('id')->on('statuses');
         });
+
+        DB::statement('ALTER TABLE films ADD FULLTEXT(name, origin_name)');
     }
 
     /**

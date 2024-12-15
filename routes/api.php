@@ -36,14 +36,20 @@ Route::prefix('film')->group(function () {
     Route::get('/search', [FilmController::class,'getFilmBySearch'])->name('api_search_film');
     Route::get('/genre/{slug}', [FilmController::class,'getFilmByGenre'])->name('api_genre_film');
     Route::get('/country/{slug}', [FilmController::class,'getFilmByCountry'])->name('api_country_film');
+    Route::prefix('wishlist')->group(function () {
+        Route::get('/{userId}', [FilmController::class, 'getWishlistById'])->name('api_wishlist_film');
+        Route::put('/{userId}-{filmId}', [FilmController::class, 'saveUserFilm'])->name('api_wishlist_film');
+    });
 });
 
-Route::prefix('genre')->group(function () {
-    Route::get('/', [GenreController::class, 'getAllGenres'])->name('api_list_genre');
-    Route::get('/{slug}', [GenreController::class,'getGenreDetail'])->name('api_genre_detail');
-});
+Route::prefix('category')->group(function () {
+    Route::prefix('genres')->group(function () {
+        Route::get('/', [GenreController::class, 'getAllGenres'])->name('api_list_genre');
+        Route::get('/{slug}', [GenreController::class,'getGenreDetail'])->name('api_genre_detail');
+    });
 
-Route::prefix('country')->group(function () {
-    Route::get('/', [CountryController::class, 'getAllCountries'])->name('api_list_country');
-    Route::get('/{slug}', [CountryController::class, 'getCountryDetail'])->name('api_country_detail');
+    Route::prefix('countries')->group(function () {
+        Route::get('/', [CountryController::class, 'getAllCountries'])->name('api_list_country');
+        Route::get('/{slug}', [CountryController::class, 'getCountryDetail'])->name('api_country_detail');
+    });
 });

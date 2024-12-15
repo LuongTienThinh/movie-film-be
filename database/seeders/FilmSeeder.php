@@ -21,7 +21,11 @@ class FilmSeeder extends Seeder
 
         $data = json_decode($jsonData);
 
-        foreach ($data as $value) {
+        $uploadFolderPath = config('app.url') . '/public/uploads';
+        $thumbnailFolderPath = $uploadFolderPath . '/thumbnails';
+        $posterFolderPath = $uploadFolderPath . '/posters';
+
+        foreach ($data as $index => $value) {
             $film = $value->movie;
             $episodes = $value->episodes;
 
@@ -34,8 +38,8 @@ class FilmSeeder extends Seeder
                 "origin_name" => $film->origin_name,
                 "description" => $film->content,
                 "quality" => $film->quality,
-                "poster_url" => $film->poster_url,
-                "thumbnail_url" => $film->thumb_url,
+                "poster_url" => $posterFolderPath . '/' . basename($film->poster_url, '.jpg') . '.webp',
+                "thumbnail_url" => $thumbnailFolderPath . '/' . basename($film->thumb_url, '.jpg') . '.webp',
                 "trailer_url" => $film->trailer_url,
                 "time" => $film->time,
                 "episode_current" => $film->episode_current,
@@ -77,6 +81,8 @@ class FilmSeeder extends Seeder
                     "updated_at" => $updated_at,
                 ]);
             }
+
+            dump(round($index / count($data) * 100, 2) . '%');
         }
     }
 }

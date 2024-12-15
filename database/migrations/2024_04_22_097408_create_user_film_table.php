@@ -13,6 +13,8 @@ return new class extends Migration
     {
         Schema::create('user_film', function (Blueprint $table) {
             $table->id();
+            $table->unsignedBigInteger('user_id');
+            $table->unsignedBigInteger('film_id');
             $table->boolean('is_view')->default(false);
             $table->boolean('is_follow')->default(false);
             $table->timestamps();

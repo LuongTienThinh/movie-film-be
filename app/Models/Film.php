@@ -43,4 +43,9 @@ class Film extends Model
     {
         return $this->belongsToMany(Country::class);
     }
+    
+    public function users()
+    {
+        return $this->belongsToMany(User::class, 'user_film', 'film_id', 'user_id');
+    }
 }
