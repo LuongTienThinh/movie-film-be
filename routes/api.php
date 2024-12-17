@@ -37,8 +37,9 @@ Route::prefix('film')->group(function () {
     Route::get('/genre/{slug}', [FilmController::class,'getFilmByGenre'])->name('api_genre_film');
     Route::get('/country/{slug}', [FilmController::class,'getFilmByCountry'])->name('api_country_film');
     Route::prefix('wishlist')->group(function () {
-        Route::get('/{userId}', [FilmController::class, 'getWishlistById'])->name('api_wishlist_film');
-        Route::put('/{userId}-{filmId}', [FilmController::class, 'saveUserFilm'])->name('api_wishlist_film');
+        Route::get('/{userId}', [FilmController::class, 'getWishlistByUserID'])->name('api_wishlist_user_film');
+        Route::get('/{userId}/{filmId}', [FilmController::class, 'getWishlistDetailByUserID'])->name('api_wishlist_user_film_detail');
+        Route::put('/{userId}/{filmId}', [FilmController::class, 'saveUserFilm'])->name('api_save_wishlist_user_film_detail');
     });
 });
 

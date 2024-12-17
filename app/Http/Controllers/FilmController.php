@@ -116,14 +116,36 @@ class FilmController extends Controller
         }
     }
 
-    public function getWishlistById(Request $request, int $userId)
+    public function getWishlistByUserID(Request $request, int $userId)
     {
         try {
-            $films = User::find($userId)->films()->getQuery();
-
+            $films = User::find($userId)->films()
+                                        ->getQuery()
+                                        ->select('films.id as id', 'films.*', 'is_follow', 'is_view')
+                                        ->where(function ($query) {
+                                            $query->where('is_follow', '=', true)
+                                                  ->orWhere('is_view', '=', true);
+                                        });
+                                        
             $data = $this->getApiFilm($request, $films, 'user_film');
 
-            return $this->successResponse($data, 200, "Get user wishlist films success.");
+            return $this->successResponse($data, 200, "Get user films success.");
+        } catch (Exception $e) {
+            return $this->errorResponse(500, $e->getMessage());
+        }
+    }
+
+    public function getWishlistDetailByUserID(Request $request, int $userId, int $filmId)
+    {
+        try {
+            $film = User::find($userId)->films()
+                                        ->select('films.id as id', 'films.*', 'is_follow', 'is_view')
+                                        ->where('user_film.film_id', '=', $filmId)
+                                        ->first();
+                                        
+            $data = $this->formatFilm($film);
+
+            return $this->successResponse($data, 200, "Get film detail success.");
         } catch (Exception $e) {
             return $this->errorResponse(500, $e->getMessage());
         }
@@ -132,8 +154,8 @@ class FilmController extends Controller
     public function saveUserFilm(Request $request, int $userId, int $filmId)
     {
         try {
-            $viewed = $request->input('viewed', false);
-            $followed = $request->input('followed', false);
+            $viewed = filter_var($request->viewed, FILTER_VALIDATE_BOOLEAN);
+            $followed = filter_var($request->followed, FILTER_VALIDATE_BOOLEAN);
 
             $userFilm = UserFilm::query()->where('user_id', $userId)->where('film_id', $filmId)->first();
 
@@ -144,9 +166,13 @@ class FilmController extends Controller
                 ]);
             }
 
-            $userFilm->is_view = $viewed;
-            $userFilm->is_follow = $followed;
+            if (isset($viewed)) {
+                $userFilm->is_view = $viewed;
+            }
 
+            if (isset($followed)) {
+                $userFilm->is_follow = $followed;
+            }
             $userFilm->save();
 
             return $this->successResponse($userFilm, 200, "Save user film success.");
@@ -169,6 +195,33 @@ class FilmController extends Controller
 
     private function formatFilm(Film $film)
     {
+        $addFormat = [];
+
+        $fields = [
+            'is_view'           => 'boolean',
+            'is_follow'         => 'boolean',
+            'is_delete'         => 'boolean',
+            "episode_current"   => 'int',
+            "episode_total"     => 'int',
+            "year"              => 'int',
+        ];
+        
+        foreach ($fields as $field => $type) {
+            if (isset($film->$field)) {
+                switch ($type) {
+                    case 'boolean':
+                        $addFormat[$field] = (int) $film->$field;
+                        break;
+                    case 'int':
+                        $addFormat[$field] = (int) $film->$field;
+                        break;
+                    case 'string':
+                        $addFormat[$field] = (string) $film->$field;
+                        break;
+                }
+            }
+        }
+
         return [
             ...$film->toArray(),
             "status" => $film->status->name,
@@ -176,6 +229,7 @@ class FilmController extends Controller
             "genres" => $film->genre,
             "countries" => $film->country,
             "episodes" => $film->episode,
+            ...$addFormat
         ];
     }
 
