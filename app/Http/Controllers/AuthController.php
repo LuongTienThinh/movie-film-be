@@ -20,7 +20,6 @@ class AuthController extends Controller
             $user = Auth::user();
             $token = $user->createToken('auth-token')->plainTextToken;
 
-            // return $this->successResponse(["user" => $user], 200, "Đăng nhập thành công.");
             return $this->successResponse(["user" => $user, "token" => $token], 200, "Đăng nhập thành công.");
         } else {
             return $this->errorResponse(500, "Sai tài khoản hoặc mật khẩu.");

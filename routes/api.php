@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\UserController;
 use App\Http\Controllers\CountryController;
 use App\Http\Controllers\FilmController;
 use App\Http\Controllers\GenreController;
@@ -18,8 +19,13 @@ use App\Http\Controllers\AuthController;
 |
 */
 
-Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
-    return $request->user();
+Route::prefix('user')->middleware('auth:sanctum')->group(function () {
+    Route::get('/', function (Request $request) {
+        return $request->user();
+    });
+
+    Route::get('/theme', [UserController::class, 'getThemeMode']);
+    Route::put('/update-theme', [UserController::class, 'updateThemeMode']);
 });
 
 Route::prefix('auth')->group(function () {
@@ -36,6 +42,7 @@ Route::prefix('film')->group(function () {
     Route::get('/search', [FilmController::class,'getFilmBySearch'])->name('api_search_film');
     Route::get('/genre/{slug}', [FilmController::class,'getFilmByGenre'])->name('api_genre_film');
     Route::get('/country/{slug}', [FilmController::class,'getFilmByCountry'])->name('api_country_film');
+    
     Route::prefix('wishlist')->group(function () {
         Route::get('/{userId}', [FilmController::class, 'getWishlistByUserID'])->name('api_wishlist_user_film');
         Route::get('/{userId}/{filmId}', [FilmController::class, 'getWishlistDetailByUserID'])->name('api_wishlist_user_film_detail');

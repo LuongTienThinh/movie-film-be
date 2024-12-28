@@ -35,8 +35,8 @@ class FilmSeeder extends Seeder
             $newFilm = Film::create([
                 "name" => $film->name,
                 "slug" => $film->slug,
-                "origin_name" => $film->origin_name,
-                "description" => $film->content,
+                "origin_name" => $film->origin_name ?? '',
+                "description" => $film->content ?? '',
                 "quality" => $film->quality,
                 "poster_url" => $posterFolderPath . '/' . basename($film->poster_url, '.jpg') . '.webp',
                 "thumbnail_url" => $thumbnailFolderPath . '/' . basename($film->thumb_url, '.jpg') . '.webp',
@@ -44,7 +44,7 @@ class FilmSeeder extends Seeder
                 "time" => $film->time,
                 "episode_current" => $film->episode_current,
                 "episode_total" => $film->episode_total,
-                "year" => $film->year,
+                "year" => $film->year ?? 0,
                 "status_id" => $film->status,
                 "type_id" => $film->type,
                 "is_delete" => false,
@@ -76,13 +76,13 @@ class FilmSeeder extends Seeder
                     "title" => $ep->title,
                     "name" => $ep->name,
                     "slug" => $ep->slug,
-                    "link" => $ep->link,
+                    "link" => $ep->link ?? '',
                     "created_at" => $created_at,
                     "updated_at" => $updated_at,
                 ]);
             }
 
-            dump(round($index / count($data) * 100, 2) . '%');
+            echo "\r" . round($index / count($data) * 100, 2) . '%';
         }
     }
 }

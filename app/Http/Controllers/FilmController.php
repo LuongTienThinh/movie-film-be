@@ -138,10 +138,22 @@ class FilmController extends Controller
     public function getWishlistDetailByUserID(Request $request, int $userId, int $filmId)
     {
         try {
+            $userFilm = UserFilm::query()->where('user_id', $userId)->where('film_id', $filmId)->first();
+            
+            if (!$userFilm) {
+                $film = UserFilm::create([
+                    'user_id'   => $userId,
+                    'film_id'   => $filmId,
+                    'is_follow' => false,
+                    'is_view'   => false,
+                ]);
+            }
+
             $film = User::find($userId)->films()
                                         ->select('films.id as id', 'films.*', 'is_follow', 'is_view')
                                         ->where('user_film.film_id', '=', $filmId)
                                         ->first();
+
                                         
             $data = $this->formatFilm($film);
 
@@ -224,11 +236,12 @@ class FilmController extends Controller
 
         return [
             ...$film->toArray(),
-            "status" => $film->status->name,
-            "type" => $film->type->name,
-            "genres" => $film->genre,
-            "countries" => $film->country,
-            "episodes" => $film->episode,
+            "status"        => $film->status->name,
+            "type"          => $film->type->name,
+            "genres"        => $film->genre,
+            "countries"     => $film->country,
+            "episodes"      => $film->episode,
+            "description"   => strip_tags($film->description),
             ...$addFormat
         ];
     }
