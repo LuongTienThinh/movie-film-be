@@ -16,6 +16,7 @@ return new class extends Migration
             $table->text('name');
             $table->text('origin_name');
             $table->string('slug');
+            $table->string('server');
             $table->text('description');
             $table->string('quality');
             $table->string('poster_url');
