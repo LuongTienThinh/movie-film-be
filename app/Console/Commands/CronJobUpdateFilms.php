@@ -45,7 +45,6 @@ class CronJobUpdateFilms extends Command
      */
     public function handle()
     {
-        // Giả sử $this->server là một mảng dữ liệu bạn muốn xử lý
         foreach ($this->server as $name => $value) {
             $data = $this->formatData($name);
 
@@ -119,7 +118,7 @@ class CronJobUpdateFilms extends Command
                     }
                     DB::table("episodes")->insert($episodesData);
 
-                    echo "\r" . str_repeat(' ', 100);
+                    echo "\r" . str_repeat(' ', 200);
                     echo "\r Insert new data: " . round($index / count($data) * 100, 2) . '%';
                 }
 
@@ -216,10 +215,8 @@ class CronJobUpdateFilms extends Command
     }
     
     public function getAnimeDetail($svName, $page = 1) {
-        global $connect;
-    
         $paginations = $this->getAnimePagination($svName);
-        $slugList = array_reverse($this->getAnimeByPage($svName, $page));
+        $slugList = $this->getAnimeByPage($svName, $page);
         $result = [];
     
         try {
@@ -244,8 +241,9 @@ class CronJobUpdateFilms extends Command
                 $film = Film::where('slug', $slug)->where('server', $svName)->first();
     
                 if ($film) {
-                    if ($film['updated_at'] === $updated_at && $film['slug'] === $slug && $film['server'] === $svName) {
+                    if (Carbon::parse($film['updated_at'])->format('Y-m-d H:i:s') === $updated_at && $film['slug'] === $slug && $film['server'] === $svName) {
                         $flag = true;
+                        unset($result[$index]);
                         break;
                     } else {
                         $film->updated_at = $updated_at;
@@ -270,12 +268,12 @@ class CronJobUpdateFilms extends Command
                                 ]);
                             }
                         }
+                        unset($result[$index]);
                     }
-                    unset($result[$index]);
                 }
 
-                echo "\r" . str_repeat(' ', 100);
-                echo "\r Reading slug: " . ($page - 1) * count($slugList) + $index + 1;
+                echo "\r" . str_repeat(' ', 200);
+                echo "\r Reading slug: " . ($page - 1) * count($slugList) + $index + 1 . " - $slug";
             }
     
             if (!$flag && $page < $paginations['total']) {
