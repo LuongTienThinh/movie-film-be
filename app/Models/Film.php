@@ -19,6 +19,27 @@ class Film extends Model
         'status_id',
     ];
 
+    protected $fillable = [
+        'name',
+        'slug',
+        'server',
+        'origin_name',
+        'description',
+        'quality',
+        'poster_url',
+        'thumbnail_url',
+        'trailer_url',
+        'time',
+        'episode_current',
+        'episode_total',
+        'year',
+        'status_id',
+        'type_id',
+        'is_delete',
+        'created_at',
+        'updated_at',
+    ];
+
     public function episode(): HasMany
     {
         return $this->hasMany(Episode::class);
