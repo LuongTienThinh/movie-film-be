@@ -12,7 +12,7 @@ class Kernel extends ConsoleKernel
      */
     protected function schedule(Schedule $schedule): void
     {
-        // $schedule->command('app:cron-job-update-films')->hourly();
+        $schedule->command('app:cron-job-update-films')->hourly();
     }
 
     /**

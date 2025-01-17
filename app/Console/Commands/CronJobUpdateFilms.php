@@ -51,7 +51,15 @@ class CronJobUpdateFilms extends Command
             $uploadFolderPath = config('app.url') . '/public/uploads';
             $thumbnailFolderPath = $uploadFolderPath . '/thumbnails';
             $posterFolderPath = $uploadFolderPath . '/posters';
-            
+
+            $saveUploadFolderPath = public_path('uploads');
+            $imageFolderPath = [
+                'posters'               => $uploadFolderPath . '/posters',
+                'thumbnails'            => $uploadFolderPath . '/thumbnails',
+                'posters-need-compress' => $saveUploadFolderPath . '/posters-need-compress',
+                'thumbnails-need-compress' => $saveUploadFolderPath . '/thumbnails-need-compress',
+            ];
+
             DB::beginTransaction();
             try {
                 foreach ($data as $index => $value) {
@@ -68,8 +76,8 @@ class CronJobUpdateFilms extends Command
                         "origin_name"       => $film['origin_name'] ?? '',
                         "description"       => $film['content'] ?? '',
                         "quality"           => $film['quality'],
-                        "poster_url"        => $posterFolderPath . '/' . basename($film['poster_url'], '.jpg') . '.webp',
-                        "thumbnail_url"     => $thumbnailFolderPath . '/' . basename($film['thumb_url'], '.jpg') . '.webp',
+                        "poster_url"        => $imageFolderPath['posters'] . '/' . pathinfo($film['poster_url'])['filename'] . '.webp',
+                        "thumbnail_url"     => $imageFolderPath['thumbnails'] . '/' . pathinfo($film['thumb_url'])['filename'] . '.webp',
                         "trailer_url"       => $film['trailer_url'],
                         "time"              => $film['time'],
                         "episode_current"   => $film['episode_current'],
@@ -82,10 +90,21 @@ class CronJobUpdateFilms extends Command
                         "updated_at"        => $updated_at,
                     ]);
 
+                    $localPoster    = $imageFolderPath['posters'] . '/' . pathinfo($newFilm->poster_url)['filename'] . '.webp';
+                    $localThumbnail = $imageFolderPath['thumbnails'] . '/' . pathinfo($newFilm->thumbnail_url)['filename'] . '.webp';
+
+                    if (!$this->isExistInFolder($localPoster)) {
+                        echo $this->downloadImage($film['poster_url'], $imageFolderPath['posters-need-compress'] . '/' . basename($newFilm->poster_url)) . "\n";
+                    }
+        
+                    if (!$this->isExistInFolder($localThumbnail)) {
+                        echo $this->downloadImage($film['thumb_url'], $imageFolderPath['thumbnails-need-compress'] . '/' . basename($newFilm->thumbnail_url)) . "\n";
+                    }
+
                     $filmGenres = [];
                     foreach ($film['genres'] as $genre) {
                         $filmGenres[] = [
-                            "film_id"       => $newFilm['id'],
+                            "film_id"       => $newFilm->id,
                             "genre_id"      => $genre,
                             "created_at"    => $created_at,
                             "updated_at"    => $updated_at,
@@ -96,7 +115,7 @@ class CronJobUpdateFilms extends Command
                     $filmCountries = [];
                     foreach ($film['countries'] as $country) {
                         $filmCountries[] = [
-                            "film_id"       => $newFilm['id'],
+                            "film_id"       => $newFilm->id,
                             "country_id"    => $country,
                             "created_at"    => $created_at,
                             "updated_at"    => $updated_at,
@@ -107,7 +126,7 @@ class CronJobUpdateFilms extends Command
                     $episodesData = [];
                     foreach ($episodes as $ep) {
                         $episodesData[] = [
-                            "film_id"       => $newFilm['id'],
+                            "film_id"       => $newFilm->id,
                             "title"         => $ep['title'],
                             "name"          => $ep['name'],
                             "slug"          => $ep['slug'],
@@ -118,14 +137,14 @@ class CronJobUpdateFilms extends Command
                     }
                     DB::table("episodes")->insert($episodesData);
 
-                    echo "\r" . str_repeat(' ', 200);
-                    echo "\r Insert new data: " . round($index / count($data) * 100, 2) . '%';
+                    print_r($film);
+                    echo "Insert new data: " . round($index / count($data) * 100, 2) . '%\n';
                 }
 
                 DB::commit();
             } catch (\Exception $e) {
                 DB::rollBack();
-                echo "Lỗi: " . $e->getMessage();
+                echo "Lỗi: " . $e->getMessage() . "\n";
             }
         }
     }
@@ -220,7 +239,6 @@ class CronJobUpdateFilms extends Command
         $result = [];
     
         try {
-            $flag = false;
             foreach ($slugList as $index => $slug) {
                 $data = $this->getDetailFilm($svName, $slug);
     
@@ -239,14 +257,45 @@ class CronJobUpdateFilms extends Command
                 $updated_at = Carbon::parse($result[$index]['movie']['modified']['time'])->format('Y-m-d H:i:s');
     
                 $film = Film::where('slug', $slug)->where('server', $svName)->first();
-    
+
                 if ($film) {
-                    if (Carbon::parse($film['updated_at'])->format('Y-m-d H:i:s') === $updated_at && $film['slug'] === $slug && $film['server'] === $svName) {
-                        $flag = true;
+                    $uploadFolderPath = config('app.url') . '/public/uploads';
+                    $saveUploadFolderPath = public_path('uploads');
+
+                    $imageFolderPath = [
+                        'posters'               => $uploadFolderPath . '/posters',
+                        'thumbnails'            => $uploadFolderPath . '/thumbnails',
+                        'posters-need-compress' => $saveUploadFolderPath . '/posters-need-compress',
+                        'thumbnails-need-compress' => $saveUploadFolderPath . '/thumbnails-need-compress',
+                    ];
+
+                    $posterUrl      = $svName == 'kkphim' ? $result[$index]['movie']['poster_url'] : $result[$index]['movie']['thumb_url'];
+                    $thumbnailUrl   = $svName == 'kkphim' ? $result[$index]['movie']['thumb_url'] : $result[$index]['movie']['poster_url'];
+
+                    $localPoster    = $imageFolderPath['posters'] . '/' . pathinfo($posterUrl)['filename'] . '.webp';
+                    $localThumbnail = $imageFolderPath['thumbnails'] . '/' . pathinfo($thumbnailUrl)['filename'] . '.webp';
+
+                    if (!$this->isExistInFolder($localPoster)) {
+                        echo $this->downloadImage($posterUrl, $imageFolderPath['posters-need-compress'] . '/' . basename($posterUrl)) . "\n";
+                    }
+
+                    if (!$this->isExistInFolder($localThumbnail)) {
+                        echo $this->downloadImage($thumbnailUrl, $imageFolderPath['thumbnails-need-compress'] . '/' . basename($thumbnailUrl)) . "\n";
+                    }
+
+                    if (Carbon::parse($film->updated_at)->format('Y-m-d H:i:s') === $updated_at && $film->slug === $slug && $film->server === $svName) {
                         unset($result[$index]);
-                        break;
                     } else {
-                        $film->updated_at = $updated_at;
+                        $statuses = json_decode(file_get_contents(base_path('/data') . "/$svName/status.json"), true);
+                        
+                        $film->updated_at       = $updated_at;
+                        $film->origin_name      = $result[$index]['movie']['origin_name'];
+                        $film->description      = $result[$index]['movie']['content'];
+                        $film->episode_total    = (int) $result[$index]['movie']['episode_total'] ?? 0;
+                        $film->episode_current  = count($result[$index]['episodes']) ?: 0;
+                        $film->year             = $result[$index]['movie']['year'];
+                        $film->status_id        = array_search($result[$index]['movie']['status'], array_column($statuses, 'slug')) + 1;
+                        $film->trailer_url      = $result[$index]['movie']['trailer_url'];
                         $film->save();
     
                         foreach ($result[$index]['episodes'] as $ep) {
@@ -257,26 +306,35 @@ class CronJobUpdateFilms extends Command
                             $currentTime = Carbon::now();
                     
                             if (!$existingEpisode) {
-                                Episode::create([
-                                    'film_id' => $film->id,
-                                    'title' => $ep['title'],
-                                    'name' => $ep['name'],
-                                    'slug' => $ep['slug'],
-                                    'link' => $ep['link'],
-                                    'created_at' => $currentTime,
-                                    'updated_at' => $currentTime,
-                                ]);
+                                try {
+                                    $episode = Episode::create([
+                                        'film_id' => $film->id,
+                                        'title' => $ep['title'],
+                                        'name' => $ep['name'],
+                                        'slug' => $ep['slug'],
+                                        'link' => $ep['link'] ?? '',
+                                        'created_at' => $currentTime,
+                                        'updated_at' => $currentTime,
+                                    ]);
+                                } catch (\Exception $e) {
+                                    echo 'Error: ' . $e->getMessage();
+                                }
+                            } else {
+                                $existingEpisode->title = $ep['title'];
+                                $existingEpisode->name = $ep['name'];
+                                $existingEpisode->slug = $ep['slug'];
+                                $existingEpisode->link = $ep['link'];
+                                $existingEpisode->save();
                             }
                         }
                         unset($result[$index]);
                     }
                 }
 
-                echo "\r" . str_repeat(' ', 200);
-                echo "\r Reading slug: " . ($page - 1) * count($slugList) + $index + 1 . " - $slug";
+                echo "Reading slug: " . ($page - 1) * count($slugList) + $index + 1 . " - $slug\n";
             }
     
-            if (!$flag && $page < $paginations['total']) {
+            if ($page < 1) {
                 $page = $page + 1;
                 $result = array_values(array_merge($this->getAnimeDetail($svName, $page), $result));
             }
@@ -356,6 +414,7 @@ class CronJobUpdateFilms extends Command
     public function editCountries($svName) {
         $data = $this->editTypes($svName);
         $countries = json_decode(file_get_contents(base_path('/data')  . "/$svName/countries.json"), true);
+        $newData = [];
     
         if ($svName == 'nguonc') {
             $result = array_filter($data, function (&$e) use ($countries) {
@@ -401,16 +460,18 @@ class CronJobUpdateFilms extends Command
                     array_splice($data, $key, 1);
                 } else {
                     $value['movie']['countries'] = array_column($value['movie']['countries'], 'id');
+                    $newData[] = $value;
                 }
             }
             
-            return $data;
+            return $newData;
         }
     }
     
     public function editGenres($svName) {
         $data = $this->editCountries($svName);
         $genres = json_decode(file_get_contents(base_path('/data') . "/$svName/genres.json"), true);
+        $newData = [];
     
         if ($svName == 'nguonc') {
             $result = array_filter($data, function ($e) use ($genres) {
@@ -460,10 +521,11 @@ class CronJobUpdateFilms extends Command
                     array_splice($data, $key, 1);
                 } else {
                     $value['movie']['genres'] = array_column($value['movie']['genres'], 'id');
+                    $newData[] = $value;
                 }
             }
             
-            return $data;
+            return $newData;
         }
     }
     
@@ -489,10 +551,10 @@ class CronJobUpdateFilms extends Command
     
                 $e['episodes'] = isset($e['movie']['episodes'][0]['items']) ? array_map(function($f) use ($e) {
                     return [
-                        'name' => $f['name'],
-                        'slug' => $f['slug'],
+                        'name'  => $f['name'],
+                        'slug'  => $f['slug'],
                         'title' => $e['movie']['name'] . '-' . $f['name'],
-                        'link' => $f['embed'] ?: ''
+                        'link'  => $f['embed'] ?: ''
                     ];
                 }, $e['movie']['episodes'][0]['items']) : [];
     
@@ -519,5 +581,31 @@ class CronJobUpdateFilms extends Command
         }
     
         return $data;
+    }
+
+    function isExistInFolder($url) {
+        $imageData = @getimagesize($url);
+        return $imageData !== false;
+    }
+
+    function downloadImage($imageUrl, $saveTo) {
+        $dir = dirname($saveTo);
+        if (!file_exists($dir)) {
+            mkdir($dir, 0777, true);
+        }
+    
+        $imageContent = @file_get_contents($imageUrl);
+    
+        if ($imageContent === false) {
+            return "Không thể tải nội dung từ URL.";
+        }
+    
+        $saved = @file_put_contents($saveTo, $imageContent);
+    
+        if ($saved === false) {
+            return "Không thể lưu file.";
+        }
+    
+        return "Hình ảnh đã được tải về thành công: " . $saveTo;
     }
 }

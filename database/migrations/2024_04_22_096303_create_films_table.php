@@ -36,6 +36,7 @@ return new class extends Migration
         });
 
         DB::statement('ALTER TABLE films ADD FULLTEXT(name, origin_name)');
+        DB::statement('CREATE INDEX idx_slug_updated_at ON films(slug, updated_at)');
     }
 
     /**
