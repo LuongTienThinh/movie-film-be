@@ -1,12 +1,13 @@
 <?php
 
-use App\Http\Controllers\UserController;
+use App\Http\Controllers\AdminController;
+use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CountryController;
 use App\Http\Controllers\FilmController;
 use App\Http\Controllers\GenreController;
+use App\Http\Controllers\UserController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\AuthController;
 
 /*
 |--------------------------------------------------------------------------
@@ -60,4 +61,16 @@ Route::prefix('category')->group(function () {
         Route::get('/', [CountryController::class, 'getAllCountries'])->name('api_list_country');
         Route::get('/{slug}', [CountryController::class, 'getCountryDetail'])->name('api_country_detail');
     });
+});
+
+
+/*
+|--------------------------------------------------------------------------
+| ADMIN Routes
+|--------------------------------------------------------------------------
+*/
+
+Route::prefix('admin')->group(function() {
+    Route::get('/', [AdminController::class, 'dashboard'])->name('admin.api_dashboard');
+    Route::get('/login', [AdminController::class, 'login'])->name('admin.api_login');
 });
