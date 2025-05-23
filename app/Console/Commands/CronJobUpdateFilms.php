@@ -54,10 +54,12 @@ class CronJobUpdateFilms extends Command
 
             $saveUploadFolderPath = public_path('uploads');
             $imageFolderPath = [
-                'posters'               => $uploadFolderPath . '/posters',
-                'thumbnails'            => $uploadFolderPath . '/thumbnails',
-                'posters-need-compress' => $saveUploadFolderPath . '/posters-need-compress',
-                'thumbnails-need-compress' => $saveUploadFolderPath . '/thumbnails-need-compress',
+                'posters'                   => $uploadFolderPath . '/posters',
+                'thumbnails'                => $uploadFolderPath . '/thumbnails',
+                'posters-compress'          => $saveUploadFolderPath . '/posters',
+                'thumbnails-compress'       => $saveUploadFolderPath . '/thumbnails',
+                'posters-need-compress'     => $saveUploadFolderPath . '/posters-need-compress',
+                'thumbnails-need-compress'  => $saveUploadFolderPath . '/thumbnails-need-compress',
             ];
 
             DB::beginTransaction();
@@ -94,11 +96,13 @@ class CronJobUpdateFilms extends Command
                     $localThumbnail = $imageFolderPath['thumbnails'] . '/' . pathinfo($newFilm->thumbnail_url)['filename'] . '.webp';
 
                     if (!$this->isExistInFolder($localPoster)) {
-                        echo $this->downloadImage($film['poster_url'], $imageFolderPath['posters-need-compress'] . '/' . basename($newFilm->poster_url)) . "\n";
+                        echo $this->downloadImage($film['poster_url'], $imageFolderPath['posters-compress'] . '/' . pathinfo($newFilm->poster_url)['filename'] . '.webp') . "\n";
+                        echo $this->downloadImage($film['poster_url'], $imageFolderPath['posters-need-compress'] . '/' . basename($film['poster_url'])) . "\n";
                     }
         
                     if (!$this->isExistInFolder($localThumbnail)) {
-                        echo $this->downloadImage($film['thumb_url'], $imageFolderPath['thumbnails-need-compress'] . '/' . basename($newFilm->thumbnail_url)) . "\n";
+                        echo $this->downloadImage($film['thumb_url'], $imageFolderPath['thumbnails-compress'] . '/' . pathinfo($newFilm->thumbnail_url)['filename'] . '.webp') . "\n";
+                        echo $this->downloadImage($film['thumb_url'], $imageFolderPath['thumbnails-need-compress'] . '/' . basename($film['thumb_url'])) . "\n";
                     }
 
                     $filmGenres = [];
@@ -136,9 +140,6 @@ class CronJobUpdateFilms extends Command
                         ];
                     }
                     DB::table("episodes")->insert($episodesData);
-
-                    print_r($film);
-                    echo "Insert new data: " . round($index / count($data) * 100, 2) . '%\n';
                 }
 
                 DB::commit();
@@ -265,6 +266,8 @@ class CronJobUpdateFilms extends Command
                     $imageFolderPath = [
                         'posters'               => $uploadFolderPath . '/posters',
                         'thumbnails'            => $uploadFolderPath . '/thumbnails',
+                        'posters-compress'      => $saveUploadFolderPath . '/posters',
+                        'thumbnails-compress'   => $saveUploadFolderPath . '/thumbnails',
                         'posters-need-compress' => $saveUploadFolderPath . '/posters-need-compress',
                         'thumbnails-need-compress' => $saveUploadFolderPath . '/thumbnails-need-compress',
                     ];
@@ -276,10 +279,12 @@ class CronJobUpdateFilms extends Command
                     $localThumbnail = $imageFolderPath['thumbnails'] . '/' . pathinfo($thumbnailUrl)['filename'] . '.webp';
 
                     if (!$this->isExistInFolder($localPoster)) {
+                        echo $this->downloadImage($posterUrl, $imageFolderPath['posters-compress'] . '/' . pathinfo($posterUrl)['filename'] . '.webp') . "\n";
                         echo $this->downloadImage($posterUrl, $imageFolderPath['posters-need-compress'] . '/' . basename($posterUrl)) . "\n";
                     }
 
                     if (!$this->isExistInFolder($localThumbnail)) {
+                        echo $this->downloadImage($thumbnailUrl, $imageFolderPath['thumbnails-compress'] . '/' . pathinfo($thumbnailUrl)['filename'] . '.webp') . "\n";
                         echo $this->downloadImage($thumbnailUrl, $imageFolderPath['thumbnails-need-compress'] . '/' . basename($thumbnailUrl)) . "\n";
                     }
 
@@ -331,10 +336,10 @@ class CronJobUpdateFilms extends Command
                     }
                 }
 
-                echo "Reading slug: " . ($page - 1) * count($slugList) + $index + 1 . " - $slug\n";
+                // echo "Reading slug: " . ($page - 1) * count($slugList) + $index + 1 . " - $slug\n";
             }
     
-            if ($page < 1) {
+            if ($page < 5) {
                 $page = $page + 1;
                 $result = array_values(array_merge($this->getAnimeDetail($svName, $page), $result));
             }
@@ -570,8 +575,9 @@ class CronJobUpdateFilms extends Command
         } else {
             foreach ($data as &$e) {
                 $e['movie']['server']           = $svName;
-                $e['movie']['episode_total']    = (int)$e['movie']['episode_total'] ?: 0;
-                $e['movie']['episode_current']  = isset($e['episodes'][0]['server_data']) ? count($e['episodes'][0]['server_data']) : 0;
+                $e['movie']['episode_total']    = (int) $e['movie']['episode_total'] ?? 0;
+                $e['movie']['episode_current']  = count($e['episodes']) ?: 0;
+                
                 $e['movie']['status']           = array_search($e['movie']['status'], array_column($statuses, 'slug')) + 1;
     
                 if ($svName == 'ophim') {

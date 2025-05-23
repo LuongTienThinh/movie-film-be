@@ -15,7 +15,8 @@ return new class extends Migration
             $table->id();
             $table->unsignedBigInteger('user_id');
             $table->unsignedBigInteger('film_id');
-            $table->boolean('is_view')->default(false);
+            $table->integer('views')->default(0);
+            $table->integer('notify')->default(0);
             $table->boolean('is_follow')->default(false);
             $table->timestamps();
         });

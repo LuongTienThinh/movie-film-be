@@ -15,8 +15,14 @@ class Film extends Model
     use FullTextSearchTrait;
 
     protected $hidden = [
+        'server',
+        'trailer_url',
         'type_id',
         'status_id',
+        'is_delete',
+        'created_at',
+        'updated_at',
+        'pivot',
     ];
 
     protected $fillable = [
@@ -40,7 +46,7 @@ class Film extends Model
         'updated_at',
     ];
 
-    public function episode(): HasMany
+    public function episodes(): HasMany
     {
         return $this->hasMany(Episode::class);
     }
@@ -55,12 +61,12 @@ class Film extends Model
         return $this->belongsTo(Status::class);
     }
 
-    public function genre(): BelongsToMany
+    public function genres(): BelongsToMany
     {
         return $this->belongsToMany(Genre::class);
     }
 
-    public function country(): BelongsToMany
+    public function countries(): BelongsToMany
     {
         return $this->belongsToMany(Country::class);
     }
@@ -68,5 +74,21 @@ class Film extends Model
     public function users()
     {
         return $this->belongsToMany(User::class, 'user_film', 'film_id', 'user_id');
+    }
+
+    public function userFilm()
+    {
+        return $this->hasMany(UserFilm::class);
+    }
+
+    public function getViewsAttribute($value)
+    {
+        return (int) ($value ?? 0);
+    }
+
+    protected function countViews() {
+        return $this->withCount(['users as views' => function ($query) {
+            $query->where('is_view', 1);
+        }])->find($id);
     }
 }

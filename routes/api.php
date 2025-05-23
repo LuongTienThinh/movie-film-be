@@ -40,9 +40,12 @@ Route::prefix('film')->group(function () {
     Route::get('/latest', [FilmController::class, 'getLatestFilm'])->name('api_latest_film');
     Route::get('/series', [FilmController::class, 'getSeriesFilms'])->name('api_series_film');
     Route::get('/movies', [FilmController::class, 'getMovieFilms'])->name('api_movies_film');
+    Route::get('/top-views', [FilmController::class, 'getTopViewedFilms'])->name('api_top_views_film');
     Route::get('/search', [FilmController::class,'getFilmBySearch'])->name('api_search_film');
     Route::get('/genre/{slug}', [FilmController::class,'getFilmByGenre'])->name('api_genre_film');
     Route::get('/country/{slug}', [FilmController::class,'getFilmByCountry'])->name('api_country_film');
+    
+    Route::get('/updated/{userId}', [FilmController::class,'getUpdatedFilmsByUser'])->name('api_country_film');
     
     Route::prefix('wishlist')->group(function () {
         Route::get('/{userId}', [FilmController::class, 'getWishlistByUserID'])->name('api_wishlist_user_film');
@@ -70,7 +73,7 @@ Route::prefix('category')->group(function () {
 |--------------------------------------------------------------------------
 */
 
-Route::prefix('admin')->group(function() {
-    Route::get('/', [AdminController::class, 'dashboard'])->name('admin.api_dashboard');
-    Route::get('/login', [AdminController::class, 'login'])->name('admin.api_login');
-});
+// Route::prefix('admin')->group(function() {
+//     Route::get('/', [AdminController::class, 'dashboard'])->name('admin.api_dashboard');
+//     Route::get('/login', [AdminController::class, 'login'])->name('admin.api_login');
+// });

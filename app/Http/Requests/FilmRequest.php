@@ -35,6 +35,8 @@ class FilmRequest extends FormRequest
             'year'              => 'required|numeric',
             'type_id'           => 'required|numeric',
             'status_id'         => 'required|numeric',
+            'genres'            => 'required|array',
+            'countries'         => 'required|array',
         ];
     }
 }
