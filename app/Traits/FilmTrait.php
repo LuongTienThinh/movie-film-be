@@ -7,18 +7,29 @@ use Illuminate\Http\Request;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use App\Models\Film;
+use Log;
 use DB;
 
 trait FilmTrait
 {
-    public function getApiFilm(Request $request, Builder $films, string $tableName = 'films')
+    public function getApiFilm(Request $request, Builder $films, string $tableName = 'films', string $order = 'updated_at')
     {
-        $pagination = $this->getPageManage($request, $films->count());
 
         $listFilms = $this->distinctSlug($films)
             ->where('is_delete', 0)
-            ->orderByDesc("$tableName.updated_at")
-            ->skip(($pagination["currentPage"] - 1) * $pagination["perPage"])
+            ->withSum(['userFilm as views' => function ($query) {
+                $query->where('views', '>', 0);
+            }], 'views');
+        
+        if ($tableName != '') {
+            $listFilms = $listFilms->orderByDesc("$tableName.$order")->orderByDesc("$tableName.updated_at");
+        } else {
+            $listFilms = $listFilms->orderByDesc($order);
+        }
+
+        $pagination = $this->getPageManage($request, $listFilms->count());
+
+        $listFilms = $listFilms->skip(($pagination["currentPage"] - 1) * $pagination["perPage"])
             ->take($pagination["perPage"])
             ->get();
 
@@ -26,18 +37,26 @@ trait FilmTrait
     }
 
     public function distinctSlug(Builder $films) {
-        return $films->join(
-            DB::raw('(SELECT slug, MAX(updated_at) AS updated_at FROM films GROUP BY slug) AS latest_films'),
-            'films.slug', '=', 'latest_films.slug'
-        )
-        ->whereColumn('films.updated_at', '=', 'latest_films.updated_at');
+        $films = $films->joinSub(
+            DB::table('films')
+                ->selectRaw('slug, MIN(updated_at) AS updated_at')
+                ->groupBy('slug'),
+            'latest_films',
+            function ($join) {
+                $join->on('films.slug', '=', 'latest_films.slug')
+                    ->whereColumn('films.updated_at', '=', 'latest_films.updated_at');
+            }
+        );
+
+        return $films;
     }
 
-    public function formatFilm(Film $film)
+
+    public function formatFilm(Film $film, array $fields = [])
     {
         $addFormat = [];
 
-        $fields = [
+        $formatFields = [
             'is_view'           => 'boolean',
             'is_follow'         => 'boolean',
             'is_delete'         => 'boolean',
@@ -46,7 +65,7 @@ trait FilmTrait
             "year"              => 'int',
         ];
         
-        foreach ($fields as $field => $type) {
+        foreach ($formatFields as $field => $type) {
             if (isset($film->$field)) {
                 switch ($type) {
                     case 'boolean':
@@ -64,13 +83,14 @@ trait FilmTrait
 
         return [
             ...$film->toArray(),
-            "status"        => $film->status->name,
-            "type"          => $film->type->name,
-            "genres"        => $film->genre,
-            "countries"     => $film->country,
-            "episodes"      => $film->episode,
-            "description"   => strip_tags($film->description),
-            ...$addFormat
+            // "status"        => $film->status->name,
+            // "type"          => $film->type->name,
+            // "genres"        => $film->genres->makeHidden('pivot'),
+            // "countries"     => $film->countries->makeHidden('pivot'),
+            // "episodes"      => $film->episodes,
+            // "description"   => strip_tags($film->description),
+            ...$addFormat,
+            ...$fields,
         ];
     }
 
@@ -84,7 +104,8 @@ trait FilmTrait
     public function getPageManage(Request $request, int $totalItem)
     {
         $page = intval($request->page);
-        $perPage = intval($request->perPage) | 8;
+        $perPage = intval($request->perPage);
+        $perPage = ($perPage && $perPage > 0) ? $perPage : 8;
         $totalPage = ceil($totalItem / $perPage);
 
         return [
