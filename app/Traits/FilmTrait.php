@@ -7,8 +7,7 @@ use Illuminate\Http\Request;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use App\Models\Film;
-use Log;
-use DB;
+use Illuminate\Support\Facades\DB;
 
 trait FilmTrait
 {
@@ -39,12 +38,13 @@ trait FilmTrait
     public function distinctSlug(Builder $films) {
         $films = $films->joinSub(
             DB::table('films')
-                ->selectRaw('slug, MIN(updated_at) AS updated_at')
+                ->selectRaw('slug, MAX(updated_at) AS updated_at, MIN(id) as id')
                 ->groupBy('slug'),
             'latest_films',
             function ($join) {
                 $join->on('films.slug', '=', 'latest_films.slug')
-                    ->whereColumn('films.updated_at', '=', 'latest_films.updated_at');
+                    ->whereColumn('films.updated_at', '=', 'latest_films.updated_at')
+                    ->whereColumn('films.id', '=', 'latest_films.id');
             }
         );
 
@@ -88,7 +88,7 @@ trait FilmTrait
             // "genres"        => $film->genres->makeHidden('pivot'),
             // "countries"     => $film->countries->makeHidden('pivot'),
             // "episodes"      => $film->episodes,
-            // "description"   => strip_tags($film->description),
+            "description"   => strip_tags($film->description),
             ...$addFormat,
             ...$fields,
         ];
