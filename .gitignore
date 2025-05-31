@@ -4,6 +4,8 @@
 /public/build
 /public/hot
 /public/storage
+/public/cache
+/public/my-error.log
 /storage/*.key
 /vendor
 .env
