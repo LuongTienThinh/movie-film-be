@@ -50,7 +50,7 @@ class UserController extends Controller
                     $userTheme->user_id = $user->id;
                     $userTheme->meta_key = 'theme_mode';
                 }
-                $userTheme->meta_value = $request->theme_mode ?? 'light';
+                $userTheme->meta_value = $request->theme_mode ?: 'light';
                 $userTheme->save();
 
                 return $this->successResponse($userTheme, 200, "Update theme mode sucessfully");
