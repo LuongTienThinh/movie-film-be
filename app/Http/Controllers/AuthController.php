@@ -7,6 +7,7 @@ use App\Models\User;
 use App\Traits\ApiResponseTrait;
 use Auth;
 use Hash;
+use Illuminate\Auth\Events\Registered;
 
 class AuthController extends Controller
 {
@@ -18,38 +19,60 @@ class AuthController extends Controller
 
         if (Auth::attempt($credentials)) {
             $user = Auth::user();
-            $token = $user->createToken('auth-token')->plainTextToken;
 
-            return $this->successResponse(["user" => $user, "token" => $token], 200, "Đăng nhập thành công.");
-        } else {
-            return $this->errorResponse(500, "Sai tài khoản hoặc mật khẩu.");
+            $token = $user->createToken('auth-token')->plainTextToken;
+            $userData = [
+                'id' => $user->id,
+                'name' => $user->name,
+                'email' => $user->email,
+            ];
+
+            return $this->successResponse(['user' => $userData, 'token' => $token], 200, 'Đăng nhập thành công.');
         }
+
+        return $this->errorResponse(401, 'Thông tin đăng nhập không hợp lệ.');
     }
 
     public function register(AuthRequest $request)
     {
-        $user = User::query()->where('email', $request->only('email'))->first();
-
-        if (!$user) {
-            $createUser = User::create([
-                'name' => $request->validated()['email'],
-                'email' => $request->validated()['email'],
-                'password' => Hash::make($request->validated()['password']),
-            ]);
-
-            return $this->successResponse(["user" => $createUser], 200, "Đăng ký thành công.");
-        } else {
-            return $this->errorResponse(500, "Email đã tồn tại");
+        $validated = $request->validated();
+        
+        if (User::where('email', $validated['email'])->exists()) {
+            return $this->errorResponse(422, 'Email đã tồn tại.');
         }
+
+        $user = User::create([
+            'name' => $validated['name'] ?? null,
+            'email' => $validated['email'],
+            'password' => Hash::make($validated['password']),
+        ]);
+
+        event(new Registered($user));
+
+        Auth::login($user);
+        $token = $user->createToken('auth-token')->plainTextToken;
+
+        $userData = [
+            'id' => $user->id,
+            'name' => $user->name,
+            'email' => $user->email,
+        ];
+    
+        return $this->successResponse(['user' => $userData, 'token' => $token], 201, 'Đăng ký thành công.');
     }
 
     public function logout()
     {
         try {
+            if (!Auth::check()) {
+                return $this->errorResponse(401, 'Chưa đăng nhập.');
+            }
+
             Auth::user()->currentAccessToken()->delete();
-            return $this->successResponse(["user" => null], 200, "Đăng xuất tài khoản thành công.");
+            return $this->successResponse([], 200, 'Đăng xuất thành công.');
         } catch (\Exception $e) {
-            return $this->errorResponse(500, $e->getMessage());
+            error_log('Lỗi đăng xuất: ' . $e->getMessage());
+            return $this->errorResponse(500, 'Lỗi khi đăng xuất.');
         }
     }
 }
