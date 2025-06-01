@@ -68,6 +68,18 @@ try {
     exit('Lỗi server: Không thể khởi tạo ImageManager: ' . $e->getMessage());
 }
 
+// Thiết lập thư mục cache
+$cacheDir = __DIR__ . '/cache/';
+$cacheTime = 7 * 24 * 60 * 60; // 7 ngày (tính bằng giây)
+if (!file_exists($cacheDir)) {
+    if (!mkdir($cacheDir, 0755, true)) {
+        error_log('Lỗi: Không thể tạo thư mục cache tại ' . $cacheDir);
+        header('HTTP/1.1 500 Internal Server Error');
+        exit('Lỗi server: Không thể tạo thư mục cache');
+    }
+    error_log('Đã tạo thư mục cache: ' . $cacheDir);
+}
+
 // Lấy tham số từ URL
 $src = isset($_GET['src']) ? $_GET['src'] : '';
 $width = isset($_GET['w']) ? (int)$_GET['w'] : 0;
@@ -81,6 +93,20 @@ if (empty($src) || $width <= 0 || $height <= 0) {
     exit('Thiếu tham số hoặc không hợp lệ');
 }
 error_log('Tham số hợp lệ: src=' . $src . ', width=' . $width . ', height=' . $height . ', zc=' . $zc);
+
+// Tạo khóa cache duy nhất dựa trên tham số
+$cacheKey = md5($src . '_' . $width . '_' . $height . '_' . $zc);
+$cacheFile = $cacheDir . $cacheKey . '.webp';
+error_log('Khóa cache: ' . $cacheKey . ', File cache: ' . $cacheFile);
+
+// Kiểm tra cache
+if (file_exists($cacheFile) && (time() - filemtime($cacheFile) < $cacheTime)) {
+    error_log('Lấy từ cache: ' . $cacheFile);
+    header('Content-Type: image/webp');
+    readfile($cacheFile);
+    exit;
+}
+error_log('Không tìm thấy cache hoặc cache đã hết hạn, tiến hành xử lý ảnh');
 
 // Kiểm tra file ảnh tồn tại và có thể truy cập
 $tempFile = null;
@@ -200,12 +226,19 @@ try {
 
     // Nén ảnh với chất lượng 80
     error_log('Bắt đầu nén ảnh sang WebP, chất lượng=80');
-    $image->toWebp(80);
+    $encodedImage = $image->toWebp(80);
     error_log('Đã nén ảnh thành công');
+
+    // Lưu ảnh vào cache
+    if (file_put_contents($cacheFile, $encodedImage) === false) {
+        error_log('Lỗi: Không thể lưu ảnh vào cache tại ' . $cacheFile);
+    } else {
+        error_log('Đã lưu ảnh vào cache: ' . $cacheFile);
+    }
 
     // Xuất ảnh
     header('Content-Type: image/webp');
-    echo $image->encode();
+    echo $encodedImage;
     error_log('Đã xuất ảnh thành công');
 
 } catch (Exception $e) {
