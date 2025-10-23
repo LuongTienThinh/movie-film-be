@@ -1,7 +1,7 @@
 <?php
 // Thiết lập log lỗi và tăng memory limit
 // ini_set('log_errors', 1);
-// ini_set('error_log', 'my-error.log');
+ini_set('error_log', 'my-error.log');
 // ini_set('memory_limit', '512M');
 
 // Ghi log khởi tạo

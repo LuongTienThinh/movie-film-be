@@ -43,8 +43,7 @@ trait FilmTrait
             'latest_films',
             function ($join) {
                 $join->on('films.slug', '=', 'latest_films.slug')
-                    ->whereColumn('films.updated_at', '=', 'latest_films.updated_at')
-                    ->whereColumn('films.id', '=', 'latest_films.id');
+                    ->whereColumn('films.updated_at', '=', 'latest_films.updated_at');
             }
         );
 

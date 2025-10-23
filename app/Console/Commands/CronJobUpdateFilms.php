@@ -19,10 +19,10 @@ class CronJobUpdateFilms extends Command
     protected $signature = 'app:cron-job-update-films';
 
     protected $server = [
-        'kkphim' => [
-            'url' => 'https://phimapi.com/v1/api/danh-sach/hoat-hinh',
-            'urlDetail' => 'https://phimapi.com/phim'
-        ],
+        // 'kkphim' => [
+        //     'url' => 'https://phimapi.com/v1/api/danh-sach/hoat-hinh',
+        //     'urlDetail' => 'https://phimapi.com/phim'
+        // ],
         'ophim' => [
             'url' => 'https://ophim1.com/v1/api/danh-sach/hoat-hinh',
             'urlDetail' => 'https://ophim1.com/phim'
@@ -241,7 +241,9 @@ class CronJobUpdateFilms extends Command
     
         try {
             foreach ($slugList as $index => $slug) {
+                $start_time = microtime(true);
                 $data = $this->getDetailFilm($svName, $slug);
+                $end_time1 = microtime(true);
     
                 $result[$index] = [
                     'movie' => $data['movie'] ?? [],
@@ -254,12 +256,18 @@ class CronJobUpdateFilms extends Command
                         ];
                     }, $data['episodes'][0]['server_data']) ?? [],
                 ];
+                $end_time2 = microtime(true);
     
                 $updated_at = Carbon::parse($result[$index]['movie']['modified']['time'])->format('Y-m-d H:i:s');
+                $end_time3 = microtime(true);
     
                 $film = Film::where('slug', $slug)->where('server', $svName)->first();
+                $end_time4 = microtime(true);
 
                 if ($film) {
+                    Episode::where('film_id', $film->id)->where('slug', '')->delete();
+                    $end_time5 = microtime(true);
+
                     $uploadFolderPath = config('app.url') . '/public/uploads';
                     $saveUploadFolderPath = public_path('uploads');
 
@@ -274,6 +282,7 @@ class CronJobUpdateFilms extends Command
 
                     $posterUrl      = $svName == 'kkphim' ? $result[$index]['movie']['poster_url'] : $result[$index]['movie']['thumb_url'];
                     $thumbnailUrl   = $svName == 'kkphim' ? $result[$index]['movie']['thumb_url'] : $result[$index]['movie']['poster_url'];
+                    echo $posterUrl;
 
                     $localPoster    = $imageFolderPath['posters'] . '/' . pathinfo($posterUrl)['filename'] . '.webp';
                     $localThumbnail = $imageFolderPath['thumbnails'] . '/' . pathinfo($thumbnailUrl)['filename'] . '.webp';
@@ -287,17 +296,23 @@ class CronJobUpdateFilms extends Command
                         echo $this->downloadImage($thumbnailUrl, $imageFolderPath['thumbnails-compress'] . '/' . pathinfo($thumbnailUrl)['filename'] . '.webp') . "\n";
                         echo $this->downloadImage($thumbnailUrl, $imageFolderPath['thumbnails-need-compress'] . '/' . basename($thumbnailUrl)) . "\n";
                     }
+                    $end_time6 = microtime(true);
 
                     if (Carbon::parse($film->updated_at)->format('Y-m-d H:i:s') === $updated_at && $film->slug === $slug && $film->server === $svName) {
                         unset($result[$index]);
                     } else {
                         $statuses = json_decode(file_get_contents(base_path('/data') . "/$svName/status.json"), true);
+
+                        $episode_current = 0;
+                        if (preg_match('/\d+/', $result[$index]['episodes'][count($result[$index]['episodes']) - 1]['slug'], $matches)) {
+                            $episode_current = (int)$matches[0];
+                        }
                         
                         $film->updated_at       = $updated_at;
                         $film->origin_name      = $result[$index]['movie']['origin_name'];
                         $film->description      = $result[$index]['movie']['content'];
                         $film->episode_total    = (int) $result[$index]['movie']['episode_total'] ?? 0;
-                        $film->episode_current  = count($result[$index]['episodes']) ?: 0;
+                        $film->episode_current  = $episode_current;
                         $film->year             = $result[$index]['movie']['year'];
                         $film->status_id        = array_search($result[$index]['movie']['status'], array_column($statuses, 'slug')) + 1;
                         $film->trailer_url      = $result[$index]['movie']['trailer_url'];
@@ -334,12 +349,22 @@ class CronJobUpdateFilms extends Command
                         }
                         unset($result[$index]);
                     }
+                    $end_time7 = microtime(true);
                 }
 
-                // echo "Reading slug: " . ($page - 1) * count($slugList) + $index + 1 . " - $slug\n";
+                echo "Reading slug: " . ($page - 1) * count($slugList) + $index + 1 . " - $slug\n";
+                echo "Time 1: " . ($end_time1 - $start_time) . "\n";
+                echo "Time 2: " . ($end_time2 - $end_time1) . "\n";
+                echo "Time 3: " . ($end_time3 - $end_time2) . "\n";
+                echo "Time 4: " . ($end_time4 - $end_time3) . "\n";
+                if ($film) {
+                    echo "Time 5: " . ($end_time5 - $end_time4) . "\n";
+                    echo "Time 6: " . ($end_time6 - $end_time5) . "\n";
+                    echo "Time 7: " . ($end_time7 - $end_time6) . "\n";
+                }
             }
     
-            if ($page < 5) {
+            if ($page < 10) {
                 $page = $page + 1;
                 $result = array_values(array_merge($this->getAnimeDetail($svName, $page), $result));
             }
@@ -426,7 +451,7 @@ class CronJobUpdateFilms extends Command
                 $e['movie']['countries'] = array_filter(
                     $e['movie']['category']['4']['list'] ?? [],
                     function (&$ct) use ($countries) {
-                        $slug = toSlug($ct['name']);
+                        $slug = $this->toSlug($ct['name']);
                         $ct['slug'] = $slug;
     
                         $cIndex = array_search($slug, array_column($countries, 'slug'));
@@ -482,7 +507,7 @@ class CronJobUpdateFilms extends Command
             $result = array_filter($data, function ($e) use ($genres) {
                 $isAnime = false;
                 $e['movie']['genres'] = array_filter($e['movie']['category']['2']['list'], function ($cate) use ($genres, &$isAnime) {
-                    $slug = toSlug($cate['name']);
+                    $slug = $this->toSlug($cate['name']);
                     $cate['slug'] = $slug;
     
                     if ($slug == 'hoat-hinh') {
@@ -540,13 +565,20 @@ class CronJobUpdateFilms extends Command
     
         if ($svName == 'nguonc') {
             foreach ($data as &$e) {
+                $episode_current = 0;
+                if (isset($e['movie']['episodes'][0]['items'])) {
+                    if (preg_match('/\d+/', $e['movie']['episodes'][0]['items'][count($e['movie']['episodes'][0]['items']) - 1]['slug'], $matches)) {
+                        $episode_current = (int)$matches[0];
+                    }
+                }
+
                 $e['movie']['origin_name']      = $e['movie']['original_name'];
                 $e['movie']['server']           = $svName;
                 $e['movie']['created']          = ['time' => $e['movie']['created']];
                 $e['movie']['modified']         = ['time' => $e['movie']['modified']];
                 $e['movie']['content']          = $e['movie']['description'];
                 $e['movie']['episode_total']    = (int) $e['movie']['total_episodes'] ?: 0;
-                $e['movie']['episode_current']  = isset($e['movie']['episodes'][0]['items']) ? count($e['movie']['episodes'][0]['items']) : 0;
+                $e['movie']['episode_current']  = $episode_current;
                 $e['movie']['year']             = isset($e['movie']['category']['3']['list'][0]['name']) ? $e['movie']['category']['3']['list'][0]['name'] : null;
                 $e['movie']['view']             = $e['movie']['view'] ?: 0;
                 $e['movie']['status']           = isset($e['movie']['category']['1']['list']) && in_array('Phim đang chiếu', array_column($e['movie']['category']['1']['list'], 'name')) ? 1 : 2;
@@ -574,9 +606,16 @@ class CronJobUpdateFilms extends Command
             }
         } else {
             foreach ($data as &$e) {
+                $episode_current = 0;
+                if (isset($e['episodes'])) {
+                    if (preg_match('/\d+/', $e['episodes'][count($e['episodes']) - 1]['slug'], $matches)) {
+                        $episode_current = (int)$matches[0];
+                    }
+                }
+                
                 $e['movie']['server']           = $svName;
                 $e['movie']['episode_total']    = (int) $e['movie']['episode_total'] ?? 0;
-                $e['movie']['episode_current']  = count($e['episodes']) ?: 0;
+                $e['movie']['episode_current']  = $episode_current ?: 0;
                 
                 $e['movie']['status']           = array_search($e['movie']['status'], array_column($statuses, 'slug')) + 1;
     
