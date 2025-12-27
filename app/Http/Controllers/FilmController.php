@@ -37,7 +37,7 @@ class FilmController extends Controller
             $film->genres()->attach($validated['genres']);
             $film->countries()->attach($validated['countries']);
 
-            return $this->successResponse($data, 201, "Film created successfully!");
+            return $this->successResponse($film, 201, "Film created successfully!");
         } catch (Exception $e) {
             return $this->errorResponse(500, $e->getMessage());
         }
@@ -49,12 +49,12 @@ class FilmController extends Controller
 
             $film->update($request->validated());
 
-            $film->type()->sync($validated['type_id']);
-            $film->status()->sync($validated['status_id']);
-            $film->genres()->sync($validated['genres']);
-            $film->countries()->sync($validated['countries']);
+            $film->type()->sync($film['type_id']);
+            $film->status()->sync($film['status_id']);
+            $film->genres()->sync($film['genres']);
+            $film->countries()->sync($film['countries']);
 
-            return $this->successResponse($data, 201, "Film udpated successfully!");
+            return $this->successResponse($film, 201, "Film udpated successfully!");
         } catch (Exception $e) {
             return $this->errorResponse(500, $e->getMessage());
         }
@@ -67,7 +67,7 @@ class FilmController extends Controller
             $film->is_delete = 1;
             $film->save();
 
-            return $this->successResponse($data, 201, "Film deleted successfully!");
+            return $this->successResponse($film, 201, "Film deleted successfully!");
         } catch (Exception $e) {
             return $this->errorResponse(500, $e->getMessage());
         }
@@ -77,6 +77,7 @@ class FilmController extends Controller
     {
         try {
             $film = Film::query()
+                ->where("id", '=', $request->id)
                 ->where("slug", '=', $request->slug)
                 ->where('is_delete', 0)
                 ->first();
@@ -103,9 +104,13 @@ class FilmController extends Controller
                 'films.name',
                 'films.year',
                 'films.slug',
+                'films.description',
                 'films.thumbnail_url',
                 'films.poster_url',
-            );
+                'films.episode_current',
+                'films.quality',
+                'films.year',
+            )->with("genres");
 
             $data = $this->getApiFilm($request, $films);
 
@@ -158,9 +163,10 @@ class FilmController extends Controller
     public function getFilmBySearch(Request $request)
     {
         try {
-            $searchFilms = $this->distinctSlug(Film::fullTextSearch(["name", "origin_name"], $request->search))->where('is_delete', 0)->get();
+            $searchFilms = $this->distinctSlug(Film::fullTextSearch(["name", "origin_name"], $request->search))->where('is_delete', 0);
+            \Log::info($searchFilms->toSql());
 
-            return $this->successResponse($searchFilms, 200, "Get search films success.");
+            return $this->successResponse($searchFilms->get(), 200, "Get search films success.");
         } catch (Exception $e) {
             return $this->errorResponse(500, $e->getMessage());
         }

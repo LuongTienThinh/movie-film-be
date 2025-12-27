@@ -1,0 +1,161 @@
+.shine-select {
+    max-width: 100%;
+    position: relative;
+    box-shadow: rgba(149, 157, 165, 0.2) 4px 4px 24px;
+}
+
+.shine-select-header {
+    width: 100%;
+    background: var(--shine-select-bg);
+    padding: var(--shine-select-padding);
+    font-size: var(--shine-select-font-size);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: var(--shine-select-padding);
+    border: none;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+    color: var(--shine-select-color);
+    border-radius: var(--shine-select-radius);
+}
+
+.shine-select-header:hover {
+    background: var(--shine-select-hover);
+}
+
+.shine-select-header svg {
+    width: 16px;
+    height: 16px;
+    transform: rotate(-90deg);
+}
+
+.shine-select-header .selected-values {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    align-items: center;
+    flex-grow: 1;
+}
+
+.shine-select-header .badge {
+    background: var(--shine-select-badge-bg);
+    padding: var(--shine-select-badge-padding);
+    border-radius: var(--shine-select-badge-radius);
+    font-size: 14px;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    cursor: default;
+}
+
+.shine-select-header .badge>.remove-btn {
+    cursor: pointer;
+    width: 16px;
+    height: 16px;
+    transition: all .3s ease;
+}
+
+.shine-select-header .search-input {
+    border: none;
+    background: transparent;
+    font-size: var(--shine-select-font-size);
+    color: var(--shine-select-color);
+    outline: none;
+    flex: 1 1 0;
+    min-width: 0;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.shine-select-header .search-input::placeholder {
+    color: var(--shine-select-color);
+    opacity: 0.7;
+}
+
+.shine-select-body {
+    position: absolute;
+    width: 100%;
+    min-width: max-content;
+    top: 100%;
+    left: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    background: var(--shine-select-body-bg);
+    padding: var(--shine-select-body-padding);
+    color: var(--shine-select-color);
+    overflow: hidden;
+    height: 0;
+    will-change: height, padding;
+    z-index: 100;
+    border-radius: 0 0 var(--shine-select-radius) var(--shine-select-radius);
+    box-shadow: rgba(149, 157, 165, 0.2) 4px 4px 24px;
+}
+
+.shine-select-body.active {
+    padding: var(--shine-select-body-padding);
+}
+
+.shine-select-body.expanding {
+    animation: select-expand 0.3s ease forwards;
+}
+
+.shine-select-body.collapsing {
+    animation: select-collapse 0.3s ease forwards;
+}
+
+.shine-select-body .shine-select-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    padding: var(--shine-select-body-padding);
+    border-radius: var(--shine-select-radius);
+    transition: all 0.3s ease;
+    cursor: pointer;
+}
+
+.shine-select-body .shine-select-item.hidden {
+    display: none;
+}
+
+.shine-select-body .shine-select-item.selected {
+    background: var(--shine-select-hover);
+}
+
+.shine-select-body .shine-select-item svg {
+    width: 24px;
+}
+
+.shine-select-body .shine-select-item:hover {
+    background-color: var(--shine-select-hover);
+}
+
+@keyframes select-expand {
+    from {
+        height: 0;
+        padding-top: 0;
+        padding-bottom: 0;
+    }
+
+    to {
+        height: var(--shine-select-target-height);
+        padding-top: var(--shine-select-body-padding);
+        padding-bottom: var(--shine-select-body-padding);
+    }
+}
+
+@keyframes select-collapse {
+    from {
+        height: var(--shine-select-target-height);
+        padding-top: var(--shine-select-body-padding);
+        padding-bottom: var(--shine-select-body-padding);
+    }
+
+    to {
+        height: 0;
+        padding-top: 0;
+        padding-bottom: 0;
+    }
+}

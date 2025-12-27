@@ -13,7 +13,11 @@ class AuthRequest extends FormRequest
      */
     public function authorize(): bool
     {
-        if ($this->route()->named('api_login') || $this->route()->named('api_sign-up')) {
+        if (
+            $this->route()->named('api_login') 
+            || $this->route()->named('api_sign-up')
+            || $this->route()->named('admin.login.submit')
+        ) {
             return true;
         }
         return Auth::check();

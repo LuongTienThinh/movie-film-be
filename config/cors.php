@@ -19,7 +19,7 @@ return [
 
     'allowed_methods' => ['*'],
 
-    'allowed_origins' => ['https://localhost:3000', 'https://animetoptd.vercel.app', 'https://animetop.id.vn'],
+    'allowed_origins' => ['https://animetop.id.vn', 'https://animetop.local'],
 
     'allowed_origins_patterns' => [],
 
