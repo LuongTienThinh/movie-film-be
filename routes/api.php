@@ -19,7 +19,7 @@ use Illuminate\Support\Facades\Route;
 | be assigned to the "api" middleware group. Make something great!
 |
 */
-Route::domain(env('API_DOMAIN'))->group(function () {
+Route::domain(env('ADMIN_DOMAIN'))->group(function () {
     Route::prefix('user')->middleware('auth:sanctum')->group(function () {
         Route::get('/', function (Request $request) {
             return $request->user();

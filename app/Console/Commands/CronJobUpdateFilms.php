@@ -19,10 +19,10 @@ class CronJobUpdateFilms extends Command
     protected $signature = 'app:cron-job-update-films';
 
     protected $server = [
-        // 'kkphim' => [
-        //     'url' => 'https://phimapi.com/v1/api/danh-sach/hoat-hinh',
-        //     'urlDetail' => 'https://phimapi.com/phim'
-        // ],
+        'kkphim' => [
+            'url' => 'https://phimapi.com/v1/api/danh-sach/hoat-hinh',
+            'urlDetail' => 'https://phimapi.com/phim'
+        ],
         'ophim' => [
             'url' => 'https://ophim1.com/v1/api/danh-sach/hoat-hinh',
             'urlDetail' => 'https://ophim1.com/phim'

@@ -89,7 +89,6 @@ class FilmController extends Controller
                 "countries"     => $film->countries->makeHidden('pivot'),
                 "episodes"      => $film->episodes
             ]);
-            dd($data);
 
             return $this->successResponse($data, 200, "Get film detail success.");
         } catch (Exception $e) {
