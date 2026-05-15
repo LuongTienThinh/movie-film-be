@@ -11,7 +11,6 @@ class DashboardController extends Controller
     public function index()
     {
         App::setLocale('vi');
-        dd(123);
         return view('admin.dashboard');
     }
 }
