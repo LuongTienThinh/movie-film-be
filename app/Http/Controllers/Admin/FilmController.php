@@ -31,7 +31,7 @@ class FilmController extends Controller
         $page = $request->page ?? 1;
         $perPage = $request->perPage ?? 10;
 
-        $films = Film::query()->take($perPage)->offset(($page - 1) * $perPage)->with(['genres', 'countries'])->orderBy('created_at', 'desc')->get();
+        $films = Film::query()->take($perPage)->offset(($page - 1) * $perPage)->with(['genres', 'countries'])->orderBy('updated_at', 'desc')->get();
         $totalFilms = Film::count();
 
         $lastPage = ceil($totalFilms / $perPage);

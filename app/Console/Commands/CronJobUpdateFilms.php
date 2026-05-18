@@ -19,6 +19,8 @@ class CronJobUpdateFilms extends Command
      */
     protected $signature = 'app:cron-job-update-films';
 
+    protected $pages = 30;
+
     protected $server = [
         'kkphim' => [
             'url' => 'https://phimapi.com/v1/api/danh-sach/hoat-hinh',
@@ -373,7 +375,7 @@ class CronJobUpdateFilms extends Command
                 }
             }
     
-            if ($page < 10) {
+            if ($page < $this->pages) {
                 $page = $page + 1;
                 $result = array_values(array_merge($this->getAnimeDetail($svName, $page), $result));
             }
