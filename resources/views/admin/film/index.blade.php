@@ -8,12 +8,35 @@
         <h2 class="mb-0">{{ __('messages.film.management.list') }}</h2>
     </div>
 
-    <div class="position-relative film-search-field">
-        <input form="film-filter-form" type="search" name="search" id="search" value="{{ $search }}" placeholder="{{ __('messages.placeholder.search') }}" autocomplete="off">
-        <span class="position-absolute start-0 top-0 p-2">@include('icons.search')</span>
+    @php
+        $hasActiveFilters = count($selectedGenres) > 0 || count($selectedCountries) > 0 || count($selectedYears) > 0;
+    @endphp
+
+    <div class="film-list-toolbar">
+        <button
+            class="film-filter-toggle"
+            id="film-filter-toggle"
+            type="button"
+            aria-expanded="{{ $hasActiveFilters ? 'true' : 'false' }}"
+            aria-controls="film-filter-form"
+        >
+            <span>{{ __('messages.filter') }}</span>
+            @include('icons.filter')
+        </button>
+
+        <div class="position-relative film-search-field">
+            <input form="film-filter-form" type="search" name="search" id="search" value="{{ $search }}" placeholder="{{ __('messages.placeholder.search') }}" autocomplete="off">
+            <span class="position-absolute start-0 top-0 p-2">@include('icons.search')</span>
+        </div>
     </div>
 
-    <form id="film-filter-form" action="{{ route('admin.film.management') }}" method="GET" class="film-filter-panel">
+    <form
+        id="film-filter-form"
+        action="{{ route('admin.film.management') }}"
+        method="GET"
+        class="film-filter-panel"
+        {{ $hasActiveFilters ? '' : 'hidden' }}
+    >
         <div class="d-flex justify-content-between align-items-center gap-3">
             <h3 class="h5 mb-0">{{ __('messages.filter') }}</h3>
             <button class="btn admin-ghost-button" id="clear-film-filters" type="button">Xóa bộ lọc</button>
@@ -69,6 +92,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const table = document.getElementById('film-table');
     const searchInput = document.getElementById('search');
     const clearButton = document.getElementById('clear-film-filters');
+    const filterToggle = document.getElementById('film-filter-toggle');
     const endpoint = form.action;
     let requestController = null;
     let searchTimer = null;
@@ -118,6 +142,12 @@ document.addEventListener('DOMContentLoaded', function () {
     form.addEventListener('submit', function (event) {
         event.preventDefault();
         loadPage(1);
+    });
+
+    filterToggle.addEventListener('click', function () {
+        const willOpen = form.hidden;
+        form.hidden = !willOpen;
+        filterToggle.setAttribute('aria-expanded', String(willOpen));
     });
 
     form.querySelectorAll('.filter-checkbox').forEach(function (checkbox) {
