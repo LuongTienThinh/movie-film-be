@@ -3,44 +3,69 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\Episode;
 use App\Models\Film;
-use App\Models\User;
-use App\Models\UserFilm;
-use App\Traits\FilmTrait;
-use App\Traits\ApiResponseTrait;
-use Exception;
-use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
-use App\Http\Requests\FilmRequest;
 use App\Models\Type;
 use App\Models\Status;
 use App\Models\Genre;
 use App\Models\Country;
-use Carbon\Carbon;
 use DB;
 use Illuminate\Support\Facades\File;
 
 class FilmController extends Controller
 {
-    use FilmTrait;
-
-    public function index(Request $request) {
+    public function index(Request $request)
+    {
         $validated = $request->validate([
             'page' => ['sometimes', 'integer', 'min:1'],
             'perPage' => ['sometimes', 'integer', 'min:1', 'max:100'],
+            'search' => ['sometimes', 'nullable', 'string', 'max:100'],
+            'genres' => ['sometimes', 'array'],
+            'genres.*' => ['integer', 'distinct', 'exists:genres,id'],
+            'countries' => ['sometimes', 'array'],
+            'countries.*' => ['integer', 'distinct', 'exists:countries,id'],
+            'years' => ['sometimes', 'array'],
+            'years.*' => ['integer', 'distinct', 'min:1900', 'max:2100'],
         ]);
-        
+
         $page = $validated['page'] ?? 1;
         $perPage = $validated['perPage'] ?? 10;
+        $search = trim($validated['search'] ?? '');
+        $selectedGenres = array_map('intval', $validated['genres'] ?? []);
+        $selectedCountries = array_map('intval', $validated['countries'] ?? []);
+        $selectedYears = array_map('intval', $validated['years'] ?? []);
 
-        $query = Film::query()->where('is_delete', false);
-        $films = (clone $query)->take($perPage)->offset(($page - 1) * $perPage)->with(['genres', 'countries'])->orderBy('updated_at', 'desc')->get();
-        $totalFilms = $query->count();
+        $query = Film::query()
+            ->where('is_delete', false)
+            ->with(['genres', 'countries', 'status', 'type'])
+            ->when($search !== '', function ($query) use ($search) {
+                $query->where(function ($query) use ($search) {
+                    $query->where('name', 'like', '%' . $search . '%')
+                        ->orWhere('origin_name', 'like', '%' . $search . '%')
+                        ->orWhere('slug', 'like', '%' . $search . '%');
+                });
+            })
+            ->when($selectedGenres, function ($query) use ($selectedGenres) {
+                $query->whereHas('genres', function ($query) use ($selectedGenres) {
+                    $query->whereIn('genres.id', $selectedGenres);
+                });
+            })
+            ->when($selectedCountries, function ($query) use ($selectedCountries) {
+                $query->whereHas('countries', function ($query) use ($selectedCountries) {
+                    $query->whereIn('countries.id', $selectedCountries);
+                });
+            })
+            ->when($selectedYears, fn ($query) => $query->whereIn('year', $selectedYears));
 
-        $lastPage = ceil($totalFilms / $perPage);
+        $totalFilms = (clone $query)->count();
+        $lastPage = max(1, (int) ceil($totalFilms / $perPage));
+        $page = min($page, $lastPage);
+
+        $films = (clone $query)
+            ->orderByDesc('updated_at')
+            ->forPage($page, $perPage)
+            ->get();
 
         $pagination = [
             'page'        => $page,
@@ -54,8 +79,27 @@ class FilmController extends Controller
         if ($request->ajax()) {
             return view('admin.film.table', compact('films', 'pagination'))->render();
         }
-        
-        return view('admin.film.index', compact('films', 'pagination'));
+
+        $genres = Genre::query()->orderBy('name')->get(['id', 'name']);
+        $countries = Country::query()->orderBy('name')->get(['id', 'name']);
+        $years = Film::query()
+            ->where('is_delete', false)
+            ->whereBetween('year', [1900, 2100])
+            ->distinct()
+            ->orderByDesc('year')
+            ->pluck('year');
+
+        return view('admin.film.index', compact(
+            'films',
+            'pagination',
+            'genres',
+            'countries',
+            'years',
+            'search',
+            'selectedGenres',
+            'selectedCountries',
+            'selectedYears'
+        ));
     }
 
     public function create() {

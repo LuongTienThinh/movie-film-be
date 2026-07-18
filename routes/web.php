@@ -3,7 +3,10 @@
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\AuthController;
+use App\Http\Controllers\Admin\CountryController;
 use App\Http\Controllers\Admin\FilmController;
+use App\Http\Controllers\Admin\GenreController;
+use App\Http\Controllers\Admin\SystemController;
 
 /*
 |--------------------------------------------------------------------------
@@ -16,8 +19,14 @@ use App\Http\Controllers\Admin\FilmController;
 |
 */
 Route::domain(env('ADMIN_DOMAIN'))->group(function () {
-    Route::middleware('auth')->group(function () {
+    Route::get('/login', [AuthController::class, 'showLoginAdmin'])->name('login');
+    Route::post('/login', [AuthController::class, 'loginAdmin'])
+        ->middleware('throttle:6,1')
+        ->name('admin.login.submit');
+
+    Route::middleware(['auth', 'admin'])->group(function () {
         Route::get('/', [DashboardController::class, 'index'])->name('admin.dashboard');
+        Route::post('/logout', [AuthController::class, 'logoutAdmin'])->name('admin.logout');
 
         Route::prefix('film')->group(function() {
             Route::get('/management', [FilmController::class, 'index'])->name('admin.film.management');
@@ -27,8 +36,29 @@ Route::domain(env('ADMIN_DOMAIN'))->group(function () {
             Route::put('/update/{id}', [FilmController::class, 'update'])->name('admin.film.update');
             Route::delete('/delete/{id}', [FilmController::class, 'delete'])->name('admin.film.delete');
         });
-    });
 
-    Route::get('/login', [AuthController::class, 'showLoginAdmin'])->name('login');
-    Route::post('/login', [AuthController::class, 'loginAdmin'])->name('admin.login.submit');
+        Route::resource('genres', GenreController::class)
+            ->except('show')
+            ->names([
+                'index' => 'admin.genres.index',
+                'create' => 'admin.genres.create',
+                'store' => 'admin.genres.store',
+                'edit' => 'admin.genres.edit',
+                'update' => 'admin.genres.update',
+                'destroy' => 'admin.genres.destroy',
+            ]);
+        Route::resource('countries', CountryController::class)
+            ->except('show')
+            ->names([
+                'index' => 'admin.countries.index',
+                'create' => 'admin.countries.create',
+                'store' => 'admin.countries.store',
+                'edit' => 'admin.countries.edit',
+                'update' => 'admin.countries.update',
+                'destroy' => 'admin.countries.destroy',
+            ]);
+
+        Route::get('/system-information', [SystemController::class, 'index'])
+            ->name('admin.system.info');
+    });
 });

@@ -6,6 +6,7 @@ return [
         'icon' => 'icons.story',
         'type' => 'menu-item',
         'url' => 'admin.dashboard',
+        'active' => ['admin.dashboard'],
     ],
     ['type' => 'separator'],
     [
@@ -13,7 +14,8 @@ return [
         'type' => 'menu-item',
         'icon' => 'icons.folder',
         'dropdown' => true,
-            'children' => [
+        'active' => ['admin.film.*'],
+        'children' => [
             ['title' => 'messages.create.new', 'url' => 'admin.film.create', 'icon' => 'icons.note'],
             ['title' => 'messages.list', 'url' => 'admin.film.management', 'icon' => 'icons.list'],
         ],
@@ -23,9 +25,10 @@ return [
         'type' => 'menu-item',
         'icon' => 'icons.book',
         'dropdown' => true,
+        'active' => ['admin.genres.*'],
         'children' => [
-            ['title' => 'messages.create.new', 'url' => 'admin.dashboard', 'icon' => 'icons.note'],
-            ['title' => 'messages.list', 'url' => 'admin.dashboard', 'icon' => 'icons.list'],
+            ['title' => 'messages.create.new', 'url' => 'admin.genres.create', 'icon' => 'icons.note'],
+            ['title' => 'messages.list', 'url' => 'admin.genres.index', 'icon' => 'icons.list'],
         ],
     ],
     [
@@ -33,14 +36,16 @@ return [
         'type' => 'menu-item',
         'icon' => 'icons.flag',
         'dropdown' => true,
+        'active' => ['admin.countries.*'],
         'children' => [
-            ['title' => 'messages.create.new', 'url' => 'admin.dashboard', 'icon' => 'icons.note'],
-            ['title' => 'messages.list', 'url' => 'admin.dashboard', 'icon' => 'icons.list'],
+            ['title' => 'messages.create.new', 'url' => 'admin.countries.create', 'icon' => 'icons.note'],
+            ['title' => 'messages.list', 'url' => 'admin.countries.index', 'icon' => 'icons.list'],
         ],
     ],
     [
         'title' => 'messages.general.information',
-        'url' => 'admin.dashboard',
+        'url' => 'admin.system.info',
+        'active' => ['admin.system.*'],
         'type' => 'menu-item',
         'icon' => 'icons.setting',
     ],
