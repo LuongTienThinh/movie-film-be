@@ -7,12 +7,52 @@ use Illuminate\Http\Request;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use App\Models\Film;
+use App\Models\Type;
 use Illuminate\Support\Facades\DB;
 
 trait FilmTrait
 {
+    public function applyFilmFilters(Builder $films, Request $request): Builder
+    {
+        // $films->where('server', '!=', 'kkphim');
+        
+        if ($request->filled('q')) {
+            $q = trim($request->q);
+            if ($q !== '') {
+                $films->fullTextSearch(["name", "origin_name"], $q);
+            }
+        }
+
+        if ($request->filled('type')) {
+            $type = $request->type;
+
+            if (is_numeric($type)) {
+                $films->where('films.type_id', (int) $type);
+            } else {
+                $typeId = Type::where('slug', $type)->value('id');
+
+                if ($typeId) {
+                    $films->where('films.type_id', $typeId);
+                }
+            }
+        }
+
+        if ($request->filled('year')) {
+            $films->where('films.year', (int) $request->year);
+        }
+
+        if ($request->filled('genre')) {
+            $films->whereHas('genres', function ($query) use ($request) {
+                $query->where('genres.slug', $request->genre);
+            });
+        }
+
+        return $films;
+    }
+
     public function getApiFilm(Request $request, Builder $films, string $tableName = 'films', string $order = 'updated_at')
     {
+        $films = $this->applyFilmFilters($films, $request);
 
         $listFilms = $this->distinctSlug($films)
             ->where('is_delete', 0)
@@ -102,10 +142,14 @@ trait FilmTrait
 
     public function getPageManage(Request $request, int $totalItem)
     {
-        $page = intval($request->page);
+        $page = max(1, intval($request->page) ?: 1);
         $perPage = intval($request->perPage);
-        $perPage = ($perPage && $perPage > 0) ? $perPage : 8;
+        $perPage = ($perPage && $perPage > 0) ? min($perPage, 50) : 8;
         $totalPage = ceil($totalItem / $perPage);
+
+        if ($totalPage > 0 && $page > $totalPage) {
+            $page = $totalPage;
+        }
 
         return [
             "currentPage" => $page,

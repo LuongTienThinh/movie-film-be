@@ -30,22 +30,36 @@ class AuthRequest extends FormRequest
      */
     public function rules(): array
     {
-        $nameRule = $this->route() && $this->route()->named('api_sign-up')
-            ? 'required|string|max:255'
-            : 'sometimes|nullable|string|max:255';
+        if ($this->route() && $this->route()->named('api_login')) {
+            return [
+                'email' => 'required|email',
+                'password' => 'required|string',
+            ];
+        }
+
+        if ($this->route() && $this->route()->named('api_sign-up')) {
+            return [
+                'name' => 'required|string|max:255',
+                'email' => 'required|email',
+                'phone' => 'sometimes|nullable|string|max:20',
+                'gender' => 'sometimes|nullable|string|max:20',
+                'date_of_birth' => 'sometimes|nullable|date',
+                'password' => [
+                    'required',
+                    Password::min(8)
+                        ->letters()
+                        ->mixedCase()
+                        ->numbers()
+                        ->symbols()
+                        ->uncompromised()
+                ],
+            ];
+        }
 
         return [
-            'name' => $nameRule,
-            'email' => 'required|string',
-            'password' => [
-                'required',
-                Password::min(8)
-                    ->letters()
-                    ->mixedCase()
-                    ->numbers()
-                    ->symbols()
-                    ->uncompromised()
-            ]
+            'name' => 'sometimes|nullable|string|max:255',
+            'email' => 'required|email',
+            'password' => 'required|string',
         ];
     }
 }

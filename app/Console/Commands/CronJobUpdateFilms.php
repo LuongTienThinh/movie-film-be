@@ -10,6 +10,7 @@ use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Artisan;
 
+use App\Services\FilmSources\FilmSourceInterface;
 class CronJobUpdateFilms extends Command
 {
     /**
@@ -20,21 +21,31 @@ class CronJobUpdateFilms extends Command
     protected $signature = 'app:cron-job-update-films';
 
     protected $pages = 30;
-
-    protected $server = [
-        'kkphim' => [
-            'url' => 'https://phimapi.com/v1/api/danh-sach/hoat-hinh',
-            'urlDetail' => 'https://phimapi.com/phim'
-        ],
-        'ophim' => [
-            'url' => 'https://ophim1.com/v1/api/danh-sach/hoat-hinh',
-            'urlDetail' => 'https://ophim1.com/phim'
-        ],
-        // 'nguonc' => [
-        //     'url' => 'https://phim.nguonc.com/api/films/quoc-gia/nhat-ban',
-        //     'urlDetail' => 'https://phim.nguonc.com/api/film'
-        // ],
+    /**
+     * Map server key to adapter class
+     * @var array
+     */
+    protected $serverAdapters = [
+        'kkphim' => \App\Services\FilmSources\KkPhimSource::class,
+        'ophim'  => \App\Services\FilmSources\OphimSource::class,
+        'animapper' => \App\Services\FilmSources\AnimapperSource::class,
     ];
+
+    /**
+     * Return an adapter instance for a given server key
+     * @param string $svName
+     * @return FilmSourceInterface
+     */
+    protected function getAdapter(string $svName): FilmSourceInterface
+    {
+        if (!isset($this->serverAdapters[$svName])) {
+            throw new \Exception("Adapter for {$svName} not configured");
+        }
+
+        $class = $this->serverAdapters[$svName];
+
+        return new $class();
+    }
 
     /**
      * The console command description.
@@ -48,7 +59,7 @@ class CronJobUpdateFilms extends Command
      */
     public function handle()
     {
-        foreach ($this->server as $name => $value) {
+        foreach (array_keys($this->serverAdapters) as $name) {
             $data = $this->formatData($name);
 
             $uploadFolderPath = config('app.url') . '/public/uploads';
@@ -190,47 +201,21 @@ class CronJobUpdateFilms extends Command
     }
     
     public function getDetailFilm($svName, $slug) {    
-        $url = $this->server[$svName]['urlDetail'] . '/' . $slug;
-        $data = $this->getData($url);
-    
-        return $data;
+        $adapter = $this->getAdapter($svName);
+
+        return $adapter->getDetail($slug);
     }
     
     public function getAnimePagination($svName) {    
-        $data = $this->getData($this->server[$svName]['url']);
-    
-        $pagination = ($svName === 'nguonc') ? $data['paginate'] : $data['data']['params']['pagination'];
-    
-        if ($svName === 'nguonc') {
-            return [
-                'total' => $pagination['total_page'],
-                'films' => $pagination['total_items'],
-                'perPage' => $pagination['items_per_page'],
-                'currentPage' => $pagination['current_page'],
-            ];
-        } else {
-            return [
-                'total' => ($svName === 'kkphim') 
-                    ? $pagination['totalPages'] 
-                    : ceil($pagination['totalItems'] / $pagination['totalItemsPerPage']),
-                'films' => $pagination['totalItems'],
-                'perPage' => $pagination['totalItemsPerPage'],
-                'currentPage' => $pagination['currentPage'],
-            ];
-        }
+        $adapter = $this->getAdapter($svName);
+
+        return $adapter->getPagination();
     }
     
     public function getAnimeByPage($svName, $page) {    
-        $url = $this->server[$svName]['url'] . '?page=' . $page;
-        $data = $this->getData($url);
-    
-        $items = ($svName === 'nguonc' ? $data : $data['data'])['items'];
-    
-        $newData = array_map(function($e) {
-            return $e['slug'];
-        }, $items);
-    
-        return $newData;
+        $adapter = $this->getAdapter($svName);
+
+        return $adapter->getItemsByPage($page);
     }
     
     public function getAnime($svName) {

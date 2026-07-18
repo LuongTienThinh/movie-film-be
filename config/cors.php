@@ -19,7 +19,7 @@ return [
 
     'allowed_methods' => ['*'],
 
-    'allowed_origins' => ['https://animetop.io.vn', 'https://animetop.local'],
+    'allowed_origins' => ['https://animetop.io.vn', 'https://animetop.local', 'https://localhost:3000'],
 
     'allowed_origins_patterns' => [],
 

@@ -96,6 +96,38 @@ class FilmController extends Controller
         }
     }
 
+    public function getFilteredFilms(Request $request)
+    {
+        $request->validate([
+            'page'    => 'nullable|integer|min:1',
+            'perPage' => 'nullable|integer|min:1|max:50',
+            'q'       => 'nullable|string',
+            'type'    => 'nullable|string',
+            'genre'   => 'nullable|string|exists:genres,slug',
+            'year'    => 'nullable|integer|min:1900|max:2100',
+        ]);
+
+        try {
+            $films = Film::query()->select(
+                'films.id',
+                'films.name',
+                'films.year',
+                'films.slug',
+                'films.description',
+                'films.thumbnail_url',
+                'films.poster_url',
+                'films.episode_current',
+                'films.quality',
+            )->with('genres');
+
+            $data = $this->getApiFilm($request, $films);
+
+            return $this->successResponse($data, 200, "Get filtered films success.");
+        } catch (Exception $e) {
+            return $this->errorResponse(500, $e->getMessage());
+        }
+    }
+
     public function getLatestFilm(Request $request)
     {
         try {
@@ -208,7 +240,7 @@ class FilmController extends Controller
         }
     }
 
-    public function getWishlistByUserID(Request $request, int $userId)
+    public function getWishlistByUserID(Request $request, $userId)
     {
         try {
             $films = User::find($userId)
@@ -228,7 +260,41 @@ class FilmController extends Controller
         }
     }
 
-    public function getWishlistDetailByUserID(Request $request, int $userId, int $filmId)
+    public function getWishlistFollowByUserID(Request $request, $userId)
+    {
+        try {
+            $films = User::find($userId)
+                ->films()
+                ->getQuery()
+                ->select('films.id as id', 'films.*', 'is_follow', 'views')
+                ->where('is_follow', '=', true);
+
+            $data = $this->getApiFilm($request, $films, 'user_film');
+
+            return $this->successResponse($data, 200, "Get user followed films success.");
+        } catch (Exception $e) {
+            return $this->errorResponse(500, $e->getMessage());
+        }
+    }
+
+    public function getWishlistViewedByUserID(Request $request, $userId)
+    {
+        try {
+            $films = User::find($userId)
+                ->films()
+                ->getQuery()
+                ->select('films.id as id', 'films.*', 'is_follow', 'views')
+                ->where('views', '>', 0);
+
+            $data = $this->getApiFilm($request, $films, 'user_film', 'views');
+
+            return $this->successResponse($data, 200, "Get user viewed films success.");
+        } catch (Exception $e) {
+            return $this->errorResponse(500, $e->getMessage());
+        }
+    }
+
+    public function getWishlistDetailByUserID(Request $request, $userId, $filmId)
     {
         try {
             $userFilm = UserFilm::query()->where('user_id', $userId)->where('film_id', $filmId)->first();

@@ -14,6 +14,7 @@
         <a href="{{ route('admin.dashboard') }}">
             <img class="mw-100 py-2" src="https://animetop.io.vn/static/media/logo-dark.8fa7f755b7c9924f3948.png" alt="">
         </a>
+        {{ config('app.url') }}
         @foreach(config('menu') as $item)
             @if($item['type'] == 'menu-item')
                 <div class="menu-item">
