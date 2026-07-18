@@ -184,10 +184,15 @@ aside.sidebar a {
 }
 
 aside.sidebar .menu-item.active > a,
-aside.sidebar .menu-item .child > a.active,
 aside.sidebar a:hover {
     color: #ffffff;
     background: rgba(0, 77, 131, 0.24);
+}
+
+aside.sidebar .menu-item .child > a.active {
+    color: var(--text-menu-color);
+    background: transparent;
+    font-weight: 700;
 }
 
 main.main-content {

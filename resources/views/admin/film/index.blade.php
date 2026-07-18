@@ -4,19 +4,19 @@
 
 @section('content')
 <div class="d-flex flex-column gap-4">
-    <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
+    <div>
         <h2 class="mb-0">{{ __('messages.film.management.list') }}</h2>
-        <a class="btn admin-primary-button" href="{{ route('admin.film.create') }}">{{ __('messages.create.new') }}</a>
+    </div>
+
+    <div class="position-relative film-search-field">
+        <input form="film-filter-form" type="search" name="search" id="search" value="{{ $search }}" placeholder="{{ __('messages.placeholder.search') }}" autocomplete="off">
+        <span class="position-absolute start-0 top-0 p-2">@include('icons.search')</span>
     </div>
 
     <form id="film-filter-form" action="{{ route('admin.film.management') }}" method="GET" class="film-filter-panel">
-        <div class="d-flex flex-wrap align-items-center gap-3">
-            <div class="position-relative film-search-field">
-                <input type="search" name="search" id="search" value="{{ $search }}" placeholder="{{ __('messages.placeholder.search') }}" autocomplete="off">
-                <span class="position-absolute start-0 top-0 p-2">@include('icons.search')</span>
-            </div>
-            <button class="btn admin-secondary-button" type="submit">Tìm kiếm</button>
-            <button class="btn admin-ghost-button ms-auto" id="clear-film-filters" type="button">Xóa bộ lọc</button>
+        <div class="d-flex justify-content-between align-items-center gap-3">
+            <h3 class="h5 mb-0">{{ __('messages.filter') }}</h3>
+            <button class="btn admin-ghost-button" id="clear-film-filters" type="button">Xóa bộ lọc</button>
         </div>
 
         <div class="filter-group">
@@ -67,7 +67,7 @@
 document.addEventListener('DOMContentLoaded', function () {
     const form = document.getElementById('film-filter-form');
     const table = document.getElementById('film-table');
-    const searchInput = form.querySelector('input[name="search"]');
+    const searchInput = document.getElementById('search');
     const clearButton = document.getElementById('clear-film-filters');
     const endpoint = form.action;
     let requestController = null;
@@ -75,10 +75,13 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function buildQuery(page) {
         const params = new URLSearchParams(new FormData(form));
+        const search = searchInput.value.trim();
         params.set('page', String(page));
         params.set('perPage', '10');
 
-        if (!params.get('search')?.trim()) {
+        if (search) {
+            params.set('search', search);
+        } else {
             params.delete('search');
         }
 
@@ -128,7 +131,7 @@ document.addEventListener('DOMContentLoaded', function () {
         window.clearTimeout(searchTimer);
         searchTimer = window.setTimeout(function () {
             loadPage(1);
-        }, 350);
+        }, 800);
     });
 
     clearButton.addEventListener('click', function () {
