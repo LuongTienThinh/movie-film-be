@@ -28,11 +28,17 @@ class FilmController extends Controller
     use FilmTrait;
 
     public function index(Request $request) {
-        $page = $request->page ?? 1;
-        $perPage = $request->perPage ?? 10;
+        $validated = $request->validate([
+            'page' => ['sometimes', 'integer', 'min:1'],
+            'perPage' => ['sometimes', 'integer', 'min:1', 'max:100'],
+        ]);
+        
+        $page = $validated['page'] ?? 1;
+        $perPage = $validated['perPage'] ?? 10;
 
-        $films = Film::query()->take($perPage)->offset(($page - 1) * $perPage)->with(['genres', 'countries'])->orderBy('updated_at', 'desc')->get();
-        $totalFilms = Film::count();
+        $query = Film::query()->where('is_delete', false);
+        $films = (clone $query)->take($perPage)->offset(($page - 1) * $perPage)->with(['genres', 'countries'])->orderBy('updated_at', 'desc')->get();
+        $totalFilms = $query->count();
 
         $lastPage = ceil($totalFilms / $perPage);
 
@@ -65,46 +71,51 @@ class FilmController extends Controller
         $data = $request->validate([
             'name' => 'required|string',
             'origin_name' => 'nullable|string',
-            'total_ep' => 'nullable|numeric',
+            'total_ep' => 'nullable|integer|min:0',
             'time' => 'nullable|string',
-            'countries' => 'nullable|string',
-            'year' => 'nullable|numeric',
+            'countries' => 'nullable|array',
+            'countries.*' => 'integer|exists:countries,id',
+            'genres' => 'nullable|array',
+            'genres.*' => 'integer|exists:genres,id',
+            'year' => 'nullable|integer|min:1900|max:2100',
             'quality' => 'nullable|string',
             'slug' => 'nullable|string',
+            'description' => 'nullable|string',
+            'status_id' => 'required|integer|exists:statuses,id',
+            'type_id' => 'required|integer|exists:types,id',
             'poster' => 'nullable|image|max:5120',
             'thumbnail' => 'nullable|image|max:5120',
+            'episode_name' => 'nullable|array',
+            'episode_name.*' => 'nullable|string|max:255',
+            'episode_link' => 'nullable|array',
+            'episode_link.*' => 'nullable|string',
         ]);
 
-        $film = Film::create([
-            'name' => $data['name'],
-            'slug' => $data['slug'] ?? Str::slug($data['name']),
-            'origin_name' => $data['origin_name'] ?? $data['name'],
-            'server' => '',
-            'description' => '',
-            'quality' => $data['quality'] ?? '',
-            'time' => $data['time'] ?? '',
-            'episode_total' => $data['total_ep'] ?? null,
-            'year' => $data['year'] ?? null,
-            'status_id' => 1,
-            'type_id' => 1,
-        ]);
+        $film = DB::transaction(function () use ($request, $data) {
+            $film = Film::create([
+                'name' => $data['name'],
+                'slug' => $data['slug'] ?? Str::slug($data['name']),
+                'origin_name' => $data['origin_name'] ?? $data['name'],
+                'server' => 'admin',
+                'description' => $data['description'] ?? '',
+                'quality' => $data['quality'] ?? '',
+                'poster_url' => $this->storeUpload($request, 'poster'),
+                'thumbnail_url' => $this->storeUpload($request, 'thumbnail'),
+                'trailer_url' => '',
+                'time' => $data['time'] ?? '',
+                'episode_current' => count(array_filter($data['episode_name'] ?? [])),
+                'episode_total' => $data['total_ep'] ?? 0,
+                'year' => $data['year'] ?? (int) date('Y'),
+                'status_id' => $data['status_id'],
+                'type_id' => $data['type_id'],
+            ]);
 
-        // handle uploads
-        if ($request->hasFile('poster')) {
-            $file = $request->file('poster');
-            $name = time() . '_poster_' . uniqid() . '.' . $file->getClientOriginalExtension();
-            $file->move(public_path('uploads'), $name);
-            $film->poster = $name;
-        }
+            $film->countries()->sync($data['countries'] ?? []);
+            $film->genres()->sync($data['genres'] ?? []);
+            $this->syncEpisodes($film, $data['episode_name'] ?? [], $data['episode_link'] ?? []);
 
-        if ($request->hasFile('thumbnail')) {
-            $file = $request->file('thumbnail');
-            $name = time() . '_thumb_' . uniqid() . '.' . $file->getClientOriginalExtension();
-            $file->move(public_path('uploads'), $name);
-            $film->thumbnail = $name;
-        }
-
-        $film->save();
+            return $film;
+        });
 
         return redirect()->route('admin.film.edit', ['id' => $film->id]);
     }
@@ -117,14 +128,20 @@ class FilmController extends Controller
             'origin_name' => 'nullable|string',
             'total_ep' => 'nullable|numeric',
             'time' => 'nullable|string',
-            'countries' => 'nullable|string',
+            'countries' => 'nullable|array',
+            'countries.*' => 'integer|exists:countries,id',
+            'genres' => 'nullable|array',
+            'genres.*' => 'integer|exists:genres,id',
             'year' => 'nullable|numeric',
             'quality' => 'nullable|string',
             'slug' => 'nullable|string',
             'poster' => 'nullable|image|max:5120',
             'thumbnail' => 'nullable|image|max:5120',
-            'status_id' => 'nullable|integer',
-            'type_id' => 'nullable|integer',
+            'status_id' => 'nullable|integer|exists:statuses,id',
+            'type_id' => 'nullable|integer|exists:types,id',
+            'description' => 'nullable|string',
+            'episode_name' => 'nullable|array',
+            'episode_link' => 'nullable|array',
         ]);
 
         $film->name = $data['name'];
@@ -134,55 +151,46 @@ class FilmController extends Controller
         $film->time = $data['time'] ?? $film->time;
         $film->episode_total = $data['total_ep'] ?? $film->episode_total;
         $film->year = $data['year'] ?? $film->year;
+        $film->description = $data['description'] ?? $film->description;
 
         if (!empty($data['status_id'])) $film->status_id = $data['status_id'];
         if (!empty($data['type_id'])) $film->type_id = $data['type_id'];
 
         // handle remove flags first
         if ($request->input('remove_poster') == '1') {
-            if ($film->poster && File::exists(public_path('uploads/' . $film->poster))) {
-                File::delete(public_path('uploads/' . $film->poster));
-            }
-            $film->poster = null;
+            $this->deleteUpload($film->poster_url);
+            $film->poster_url = '';
         }
 
         if ($request->input('remove_thumbnail') == '1') {
-            if ($film->thumbnail && File::exists(public_path('uploads/' . $film->thumbnail))) {
-                File::delete(public_path('uploads/' . $film->thumbnail));
-            }
-            $film->thumbnail = null;
+            $this->deleteUpload($film->thumbnail_url);
+            $film->thumbnail_url = '';
         }
 
         // poster replacement
         if ($request->hasFile('poster')) {
             // delete old file
-            if ($film->poster && File::exists(public_path('uploads/' . $film->poster))) {
-                File::delete(public_path('uploads/' . $film->poster));
-            }
-            $file = $request->file('poster');
-            $name = time() . '_poster_' . uniqid() . '.' . $file->getClientOriginalExtension();
-            $file->move(public_path('uploads'), $name);
-            $film->poster = $name;
+            $this->deleteUpload($film->poster_url);
+            $film->poster_url = $this->storeUpload($request, 'poster');
         }
 
         // thumbnail replacement
         if ($request->hasFile('thumbnail')) {
-            if ($film->thumbnail && File::exists(public_path('uploads/' . $film->thumbnail))) {
-                File::delete(public_path('uploads/' . $film->thumbnail));
-            }
-            $file = $request->file('thumbnail');
-            $name = time() . '_thumb_' . uniqid() . '.' . $file->getClientOriginalExtension();
-            $file->move(public_path('uploads'), $name);
-            $film->thumbnail = $name;
+            $this->deleteUpload($film->thumbnail_url);
+            $film->thumbnail_url = $this->storeUpload($request, 'thumbnail');
         }
 
         $film->save();
+        $film->countries()->sync($data['countries'] ?? []);
+        $film->genres()->sync($data['genres'] ?? []);
+        $this->syncEpisodes($film, $data['episode_name'] ?? [], $data['episode_link'] ?? []);
+        $film->update(['episode_current' => count(array_filter($data['episode_name'] ?? []))]);
 
         return redirect()->back();
     }
 
     public function edit($id) {
-        $film = Film::query()->where('id', $id)->with(['genres', 'countries', 'status', 'type'])->first();
+        $film = Film::query()->where('id', $id)->with(['genres', 'countries', 'status', 'type', 'episodes'])->firstOrFail();
 
         $types = Type::query()->orderBy('name')->get();
         $statuses = Status::query()->orderBy('name')->get();
@@ -193,5 +201,56 @@ class FilmController extends Controller
         $selectedCountries = $film->countries->pluck('id')->toArray();
 
         return view('admin.film.edit', compact('film', 'types', 'statuses', 'genres', 'countries', 'selectedGenres', 'selectedCountries'));
+    }
+
+    public function delete($id)
+    {
+        $film = Film::findOrFail($id);
+        $film->update(['is_delete' => true]);
+
+        return redirect()->route('admin.film.management');
+    }
+
+    private function storeUpload(Request $request, string $field): string
+    {
+        if (! $request->hasFile($field)) {
+            return '';
+        }
+
+        $file = $request->file($field);
+        $name = time() . '_' . $field . '_' . uniqid() . '.' . $file->extension();
+        File::ensureDirectoryExists(public_path('uploads'));
+        $file->move(public_path('uploads'), $name);
+
+        return asset('uploads/' . $name);
+    }
+
+    private function deleteUpload(?string $url): void
+    {
+        if (! $url) {
+            return;
+        }
+
+        $path = public_path('uploads/' . basename(parse_url($url, PHP_URL_PATH)));
+        if (File::exists($path)) {
+            File::delete($path);
+        }
+    }
+
+    private function syncEpisodes(Film $film, array $names, array $links): void
+    {
+        $film->episodes()->delete();
+        foreach ($names as $index => $name) {
+            if (! trim((string) $name)) {
+                continue;
+            }
+
+            $film->episodes()->create([
+                'title' => $film->name . ' - ' . $name,
+                'name' => $name,
+                'slug' => Str::slug($name),
+                'link' => $links[$index] ?? '',
+            ]);
+        }
     }
 }

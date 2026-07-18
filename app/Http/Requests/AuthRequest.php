@@ -32,7 +32,7 @@ class AuthRequest extends FormRequest
     {
         if ($this->route() && $this->route()->named('api_login')) {
             return [
-                'email' => 'required|email',
+                'email' => 'required|email|max:255|unique:users,email',
                 'password' => 'required|string',
             ];
         }
@@ -46,12 +46,12 @@ class AuthRequest extends FormRequest
                 'date_of_birth' => 'sometimes|nullable|date',
                 'password' => [
                     'required',
+                    'confirmed',
                     Password::min(8)
                         ->letters()
                         ->mixedCase()
                         ->numbers()
                         ->symbols()
-                        ->uncompromised()
                 ],
             ];
         }

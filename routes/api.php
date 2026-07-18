@@ -35,10 +35,13 @@ Route::domain(env('ADMIN_DOMAIN'))->group(function () {
     Route::prefix('auth')->group(function () {
         Route::post('/sign-up', [AuthController::class, 'register'])->name('api_sign-up');
         Route::post('/login', [AuthController::class, 'login'])->name('api_login');
-        Route::get('/google/redirect', [AuthController::class, 'googleRedirect'])->name('api_google_redirect');
-        Route::get('/google/callback', [AuthController::class, 'googleCallback'])->name('api_google_callback');
-        Route::get('/facebook/redirect', [AuthController::class, 'facebookRedirect'])->name('api_facebook_redirect');
-        Route::get('/facebook/callback', [AuthController::class, 'facebookCallback'])->name('api_facebook_callback');
+        Route::middleware('web')->group(function () {
+            Route::get('/google/redirect', [AuthController::class, 'googleRedirect'])->name('api_google_redirect');
+            Route::get('/google/callback', [AuthController::class, 'googleCallback'])->name('api_google_callback');
+            Route::get('/facebook/redirect', [AuthController::class, 'facebookRedirect'])->name('api_facebook_redirect');
+            Route::get('/facebook/callback', [AuthController::class, 'facebookCallback'])->name('api_facebook_callback');
+        });
+        Route::post('/oauth/exchange', [AuthController::class, 'exchangeOAuthCode'])->name('api_oauth_exchange');
         Route::middleware('auth:sanctum')->post('/logout', [AuthController::class,'logout'])->name('api_logout');
         Route::post('/forgot-password', [AuthController::class, 'forgotPassword'])->name('api_forgot_password');
         Route::post('/reset-password', [AuthController::class, 'resetPassword'])->name('api_reset_password');
@@ -55,14 +58,16 @@ Route::domain(env('ADMIN_DOMAIN'))->group(function () {
         Route::get('/genre/{slug}', [FilmController::class,'getFilmByGenre'])->name('api_genre_film');
         Route::get('/country/{slug}', [FilmController::class,'getFilmByCountry'])->name('api_country_film');
         
-        Route::get('/updated/{userId}', [FilmController::class,'getUpdatedFilmsByUser'])->name('api_country_film');
-        
-        Route::prefix('wishlist')->group(function () {
-            Route::get('/{userId}', [FilmController::class, 'getWishlistByUserID'])->name('api_wishlist_user_film');
-            Route::get('/{userId}/follow', [FilmController::class, 'getWishlistFollowByUserID'])->name('api_wishlist_user_film_follow');
-            Route::get('/{userId}/viewed', [FilmController::class, 'getWishlistViewedByUserID'])->name('api_wishlist_user_film_viewed');
-            Route::get('/{userId}/{filmId}', [FilmController::class, 'getWishlistDetailByUserID'])->name('api_wishlist_user_film_detail');
-            Route::put('/{userId}/{filmId}', [FilmController::class, 'saveUserFilm'])->name('api_save_wishlist_user_film_detail');
+        Route::middleware('auth:sanctum')->group(function () {
+            Route::get('/updated', [FilmController::class,'getUpdatedFilmsByUser'])->name('api_updated_user_film');
+
+            Route::prefix('wishlist')->group(function () {
+                Route::get('/', [FilmController::class, 'getWishlistByUserID'])->name('api_wishlist_user_film');
+                Route::get('/follow', [FilmController::class, 'getWishlistFollowByUserID'])->name('api_wishlist_user_film_follow');
+                Route::get('/viewed', [FilmController::class, 'getWishlistViewedByUserID'])->name('api_wishlist_user_film_viewed');
+                Route::get('/{filmId}', [FilmController::class, 'getWishlistDetailByUserID'])->whereNumber('filmId')->name('api_wishlist_user_film_detail');
+                Route::put('/{filmId}', [FilmController::class, 'saveUserFilm'])->whereNumber('filmId')->name('api_save_wishlist_user_film_detail');
+            });
         });
     });
     

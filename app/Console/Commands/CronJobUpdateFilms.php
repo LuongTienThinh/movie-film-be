@@ -4,6 +4,10 @@ namespace App\Console\Commands;
 
 use App\Models\Episode;
 use App\Models\Film;
+use App\Models\Country;
+use App\Models\Genre;
+use App\Models\Status;
+use App\Models\Type;
 use Carbon\Carbon;
 use Exception;
 use Illuminate\Console\Command;
@@ -28,7 +32,7 @@ class CronJobUpdateFilms extends Command
     protected $serverAdapters = [
         'kkphim' => \App\Services\FilmSources\KkPhimSource::class,
         'ophim'  => \App\Services\FilmSources\OphimSource::class,
-        'animapper' => \App\Services\FilmSources\AnimapperSource::class,
+        // Animapper has no list endpoint yet, so it cannot participate in scheduled imports.
     ];
 
     /**
@@ -157,7 +161,7 @@ class CronJobUpdateFilms extends Command
                 }
 
                 DB::commit();
-            } catch (\Exception $e) {
+            } catch (\Throwable $e) {
                 DB::rollBack();
                 echo "Lỗi: " . $e->getMessage() . "\n";
             }
@@ -194,12 +198,6 @@ class CronJobUpdateFilms extends Command
         return str_replace(' ', '-', $this->toLowerCaseNonAccentVietnamese($str));
     }
     
-    public function getData($url) {
-        $response = file_get_contents($url);
-    
-        return json_decode($response, true);
-    }
-    
     public function getDetailFilm($svName, $slug) {    
         $adapter = $this->getAdapter($svName);
 
@@ -232,6 +230,9 @@ class CronJobUpdateFilms extends Command
     
     public function getAnimeDetail($svName, $page = 1) {
         $paginations = $this->getAnimePagination($svName);
+        if (($paginations['total'] ?? 0) < 1 || $page > min($this->pages, $paginations['total'])) {
+            return [];
+        }
         $slugList = $this->getAnimeByPage($svName, $page);
         $result = [];
     
@@ -250,7 +251,7 @@ class CronJobUpdateFilms extends Command
                             'title' => $f['filename'],
                             'link'  => $f['link_embed'] ?: ''
                         ];
-                    }, $data['episodes'][0]['server_data']) ?? [],
+                    }, $data['episodes'][0]['server_data'] ?? []),
                 ];
                 $end_time2 = microtime(true);
     
@@ -297,10 +298,9 @@ class CronJobUpdateFilms extends Command
                     if (Carbon::parse($film->updated_at)->format('Y-m-d H:i:s') === $updated_at && $film->slug === $slug && $film->server === $svName) {
                         unset($result[$index]);
                     } else {
-                        $statuses = json_decode(file_get_contents(base_path('/data') . "/$svName/status.json"), true);
-
                         $episode_current = 0;
-                        if (preg_match('/\d+/', $result[$index]['episodes'][count($result[$index]['episodes']) - 1]['slug'], $matches)) {
+                        $lastEpisode = end($result[$index]['episodes']);
+                        if ($lastEpisode && preg_match('/\d+/', $lastEpisode['slug'], $matches)) {
                             $episode_current = (int)$matches[0];
                         }
                         
@@ -310,7 +310,10 @@ class CronJobUpdateFilms extends Command
                         $film->episode_total    = (int) $result[$index]['movie']['episode_total'] ?? 0;
                         $film->episode_current  = $episode_current;
                         $film->year             = $result[$index]['movie']['year'];
-                        $film->status_id        = array_search($result[$index]['movie']['status'], array_column($statuses, 'slug')) + 1;
+                        $statusId               = Status::where('slug', $result[$index]['movie']['status'])->value('id');
+                        if ($statusId) {
+                            $film->status_id = $statusId;
+                        }
                         $film->trailer_url      = $result[$index]['movie']['trailer_url'];
                         $film->save();
     
@@ -332,7 +335,7 @@ class CronJobUpdateFilms extends Command
                                         'created_at' => $currentTime,
                                         'updated_at' => $currentTime,
                                     ]);
-                                } catch (\Exception $e) {
+                                } catch (\Throwable $e) {
                                     echo 'Error: ' . $e->getMessage();
                                 }
                             } else {
@@ -360,14 +363,15 @@ class CronJobUpdateFilms extends Command
                 }
             }
     
-            if ($page < $this->pages) {
+            if ($page < min($this->pages, $paginations['total'])) {
                 $page = $page + 1;
                 $result = array_values(array_merge($this->getAnimeDetail($svName, $page), $result));
             }
     
             return $result;
     
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
+            $this->error('Unable to update films from ' . $svName . ': ' . $e->getMessage());
             return [];
         }
     }
@@ -423,15 +427,13 @@ class CronJobUpdateFilms extends Command
     
     public function editTypes($svName) {
         $data = $this->removeUnused($svName);
-        $types = json_decode(file_get_contents(base_path('/data') . "/$svName/types.json"), true);
+        $types = Type::query()->pluck('id', 'slug');
     
         foreach ($data as &$e) {
             $type = $e['movie']['type'];
             unset($e['movie']['type']);
     
-            $index = array_search($type, array_column($types, 'slug'));
-    
-            $e['movie']['type'] = $index !== false ? $index + 1 : null;
+            $e['movie']['type'] = $types->get($type);
         }
     
         return $data;
@@ -439,7 +441,7 @@ class CronJobUpdateFilms extends Command
     
     public function editCountries($svName) {
         $data = $this->editTypes($svName);
-        $countries = json_decode(file_get_contents(base_path('/data')  . "/$svName/countries.json"), true);
+        $countries = Country::query()->pluck('id', 'slug');
         $newData = [];
     
         if ($svName == 'nguonc') {
@@ -450,9 +452,9 @@ class CronJobUpdateFilms extends Command
                         $slug = $this->toSlug($ct['name']);
                         $ct['slug'] = $slug;
     
-                        $cIndex = array_search($slug, array_column($countries, 'slug'));
-                        if ($cIndex !== false) {
-                            $ct['id'] = $cIndex + 1;
+                        $countryId = $countries->get($slug);
+                        if ($countryId) {
+                            $ct['id'] = $countryId;
                             return true;
                         }
     
@@ -474,10 +476,10 @@ class CronJobUpdateFilms extends Command
                 $value['movie']['countries'] = [];
     
                 foreach ($countryList as &$ct) {
-                    $cIndex = array_search($ct['slug'], array_column($countries, 'slug'));
+                    $countryId = $countries->get($ct['slug']);
     
-                    if ($cIndex !== false) {
-                        $ct['id'] = $cIndex + 1;
+                    if ($countryId) {
+                        $ct['id'] = $countryId;
                         $value['movie']['countries'][] = $ct;
                     }
                 }
@@ -496,7 +498,7 @@ class CronJobUpdateFilms extends Command
     
     public function editGenres($svName) {
         $data = $this->editCountries($svName);
-        $genres = json_decode(file_get_contents(base_path('/data') . "/$svName/genres.json"), true);
+        $genres = Genre::query()->pluck('id', 'slug');
         $newData = [];
     
         if ($svName == 'nguonc') {
@@ -510,9 +512,9 @@ class CronJobUpdateFilms extends Command
                         $isAnime = true;
                     }
     
-                    $cIndex = array_search($cate['slug'], array_column($genres, 'slug'));
-                    if ($cIndex !== false) {
-                        $cate['id'] = $cIndex + 1;
+                    $genreId = $genres->get($cate['slug']);
+                    if ($genreId) {
+                        $cate['id'] = $genreId;
                         return true;
                     }
     
@@ -535,10 +537,10 @@ class CronJobUpdateFilms extends Command
                 $value['movie']['genres'] = [];
     
                 foreach ($countryList as &$ct) {
-                    $gIndex = array_search($ct['slug'], array_column($genres, 'slug'));
+                    $genreId = $genres->get($ct['slug']);
     
-                    if ($gIndex !== false) {
-                        $ct['id'] = $gIndex + 1;
+                    if ($genreId) {
+                        $ct['id'] = $genreId;
                         $value['movie']['genres'][] = $ct;
                     }
                 }
@@ -557,7 +559,7 @@ class CronJobUpdateFilms extends Command
     
     public function formatData($svName) {
         $data = $this->editGenres($svName);
-        $statuses = json_decode(file_get_contents(base_path('/data') . "/$svName/status.json"), true);
+        $statuses = Status::query()->pluck('id', 'slug');
     
         if ($svName == 'nguonc') {
             foreach ($data as &$e) {
@@ -613,7 +615,7 @@ class CronJobUpdateFilms extends Command
                 $e['movie']['episode_total']    = (int) $e['movie']['episode_total'] ?? 0;
                 $e['movie']['episode_current']  = $episode_current ?: 0;
                 
-                $e['movie']['status']           = array_search($e['movie']['status'], array_column($statuses, 'slug')) + 1;
+                $e['movie']['status']           = $statuses->get($e['movie']['status']);
     
                 if ($svName == 'ophim') {
                     list($e['movie']['thumb_url'], $e['movie']['poster_url']) = [$e['movie']['poster_url'], $e['movie']['thumb_url']];

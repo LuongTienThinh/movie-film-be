@@ -9,6 +9,7 @@
     </div>
     <form action="{{ route('admin.film.update', ['id' => $film->id]) }}" method="post" autocomplete="off" enctype="multipart/form-data">
         @csrf
+        @method('PUT')
         <div class="film-detail row">
             <div class="col-8">
                 <div class="form-section">
@@ -130,8 +131,8 @@
                     <h5>{{ __('messages.film.sections.media') }}</h5>
                     <?php
                         $posterUrl = '';
-                        if (!empty($film->poster)) $posterUrl = asset('uploads/' . $film->poster);
-                        elseif (!empty($film->thumbnail)) $posterUrl = asset('uploads/' . $film->thumbnail);
+                        if (!empty($film->poster_url)) $posterUrl = $film->poster_url;
+                        elseif (!empty($film->thumbnail_url)) $posterUrl = $film->thumbnail_url;
                     ?>
 
                     <div class="file-uploader poster-uploader">
@@ -158,10 +159,10 @@
                     </div>
 
                     <div class="mt-4 file-uploader thumbnail-uploader">
-                        @if(!empty($film->thumbnail))
+                        @if(!empty($film->thumbnail_url))
                             <input type="hidden" name="remove_thumbnail" value="0">
                             <div class="file-preview">
-                                <img src="{{ asset('uploads/' . $film->thumbnail) }}" alt="thumbnail">
+                                <img src="{{ $film->thumbnail_url }}" alt="thumbnail">
                             </div>
                             <div class="d-flex gap-2">
                                 <label class="file-change">Change

@@ -24,7 +24,7 @@ Route::domain(env('ADMIN_DOMAIN'))->group(function () {
             Route::get('/create', [FilmController::class, 'create'])->name('admin.film.create');
             Route::post('/store', [FilmController::class, 'store'])->name('admin.film.store');
             Route::get('/edit/{id}', [FilmController::class, 'edit'])->name('admin.film.edit');
-            Route::post('/update/{id}', [FilmController::class, 'edit'])->name('admin.film.update');
+            Route::put('/update/{id}', [FilmController::class, 'update'])->name('admin.film.update');
             Route::delete('/delete/{id}', [FilmController::class, 'delete'])->name('admin.film.delete');
         });
     });

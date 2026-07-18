@@ -8,6 +8,8 @@ use App\Traits\ApiResponseTrait;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Auth\Events\PasswordReset;
@@ -104,36 +106,25 @@ class AuthController extends Controller
         }
     }
 
-    public function googleRedirect(Request $request)
+    public function googleRedirect()
     {
-        if ($request->has('code')) {
-            return $this->googleCallback($request);
-        }
-
-        $state = $this->makeRedirectState($request->query('redirect_uri'));
-
-        $url = Socialite::driver('google')
-            ->stateless()
-            ->with(['state' => $state])
-            ->redirect()
-            ->getTargetUrl();
-
-        return $this->successResponse([
-            'url' => $url,
-        ], 200, 'Get Google login url success.');
+        return Socialite::driver('google')->redirect();
     }
 
     public function googleCallback(Request $request)
     {
         try {
-            $googleUser = Socialite::driver('google')->stateless()->user();
+            $googleUser = Socialite::driver('google')->user();
             $email = $googleUser->getEmail();
 
             if (! $email) {
                 return $this->errorResponse(422, 'Không lấy được email từ Google.');
             }
 
-            $user = User::where('email', $email)->first();
+            $user = User::where('google_id', $googleUser->getId())->first();
+            if (! $user) {
+                $user = User::where('email', $email)->first();
+            }
 
             if (! $user) {
                 $name = $googleUser->getName()
@@ -145,8 +136,8 @@ class AuthController extends Controller
                     'email' => $email,
                     'password' => Hash::make(Str::random(32)),
                     'google_id' => $googleUser->getId(),
-                    'email_verified_at' => now(),
                 ]);
+                $user->forceFill(['email_verified_at' => now()])->save();
             } else {
                 $dirty = false;
                 if (! $user->google_id) {
@@ -162,60 +153,28 @@ class AuthController extends Controller
                 }
             }
 
-            $tokenData = $this->createTokenResponse($user);
-            $redirectUri = $this->readRedirectState($request->query('state'));
+            return $this->redirectToFrontend($user);
+        } catch (\Throwable $e) {
+            Log::warning('Google OAuth callback failed', ['exception' => $e]);
 
-            return $this->redirectToFrontend($user, $tokenData, $redirectUri);
-        } catch (\Exception $e) {
-            return $this->errorResponse(500, $e->getMessage());
+            return $this->redirectOAuthError();
         }
     }
 
-    public function facebookRedirect(Request $request)
+    public function facebookRedirect()
     {
-        if ($request->has('code')) {
-            return $this->facebookCallback($request);
-        }
-
-        if ($request->has('error') || $request->has('error_code')) {
-            $message = $request->query('error_message')
-                ?: $request->query('error_description')
-                ?: $request->query('error')
-                ?: 'Facebook login error.';
-
-            return $this->errorResponse(422, $message);
-        }
-
-        $state = $this->makeRedirectState(request()->query('redirect_uri'));
-        $withEmail = filter_var(request()->query('email_scope'), FILTER_VALIDATE_BOOLEAN);
-
-        $scopes = ['public_profile'];
-        $fields = ['id', 'name'];
-        if ($withEmail) {
-            $scopes[] = 'email';
-            $fields[] = 'email';
-        }
-
         $url = Socialite::driver('facebook')
-            ->stateless()
-            ->setScopes($scopes)
-            ->with([
-                'state' => $state,
-                'fields' => implode(',', $fields),
-            ])
-            ->redirect()
-            ->getTargetUrl();
+            ->scopes(['public_profile', 'email'])
+            ->fields(['id', 'name', 'email'])
+            ->redirect();
 
-        return $this->successResponse([
-            'url' => $url,
-        ], 200, 'Get Facebook login url success.');
+        return $url;
     }
 
     public function facebookCallback(Request $request)
     {
         try {
             $facebookUser = Socialite::driver('facebook')
-                ->stateless()
                 ->fields(['id', 'name', 'email'])
                 ->user();
             $email = $facebookUser->getEmail();
@@ -231,7 +190,8 @@ class AuthController extends Controller
                     ?: $facebookUser->getNickname()
                     ?: Str::before($email, '@');
 
-                if (! $email) {
+                $hasProviderEmail = (bool) $email;
+                if (! $hasProviderEmail) {
                     $email = 'fb_' . $facebookId . '@facebook.local';
                 }
 
@@ -240,8 +200,10 @@ class AuthController extends Controller
                     'email' => $email,
                     'password' => Hash::make(Str::random(32)),
                     'facebook_id' => $facebookId,
-                    'email_verified_at' => $email ? now() : null,
                 ]);
+                if ($hasProviderEmail) {
+                    $user->forceFill(['email_verified_at' => now()])->save();
+                }
             } else {
                 $dirty = false;
                 if (! $user->facebook_id) {
@@ -261,77 +223,53 @@ class AuthController extends Controller
                 }
             }
 
-            $tokenData = $this->createTokenResponse($user);
-            $redirectUri = $this->readRedirectState($request->query('state'));
-
-            return $this->redirectToFrontend($user, $tokenData, $redirectUri);
-        } catch (\Exception $e) {
-            return $this->errorResponse(500, $e->getMessage());
+            return $this->redirectToFrontend($user);
+        } catch (\Throwable $e) {
+            Log::warning('Facebook OAuth callback failed', ['exception' => $e]);
+            return $this->redirectOAuthError();
         }
     }
 
-    private function redirectToFrontend(User $user, array $tokenData, ?string $redirectUri = null)
+    public function exchangeOAuthCode(Request $request)
     {
-        $frontendUrl = $redirectUri ?: env('FRONTEND_URL', config('app.url'));
-
-        $query = http_build_query([
-            'token' => $tokenData['token'],
-            'token_type' => $tokenData['token_type'],
-            'expires_in' => $tokenData['expires_in'],
-            'user_id' => $user->id,
-            'name' => $user->name,
-            'email' => $user->email,
+        $validated = $request->validate([
+            'code' => ['required', 'string', 'size:64'],
         ]);
 
-        return redirect()->away(rtrim($frontendUrl, '/') . '/auth/callback?' . $query);
+        $cacheKey = 'oauth_exchange:' . hash('sha256', $validated['code']);
+        $userId = Cache::pull($cacheKey);
+
+        if (! $userId || ! ($user = User::find($userId))) {
+            return $this->errorResponse(422, 'Mã đăng nhập không hợp lệ hoặc đã hết hạn.');
+        }
+
+        $tokenData = $this->createTokenResponse($user);
+
+        return $this->successResponse([
+            'user' => $user->only(['id', 'name', 'email', 'phone', 'gender', 'date_of_birth']),
+            ...$tokenData,
+        ], 200, 'Đăng nhập thành công.');
     }
 
-    private function makeRedirectState(?string $redirectUri): ?string
+    private function redirectToFrontend(User $user)
     {
-        if (! $redirectUri) {
-            return null;
-        }
+        $code = Str::random(64);
+        Cache::put(
+            'oauth_exchange:' . hash('sha256', $code),
+            $user->id,
+            now()->addMinutes(2)
+        );
 
-        $payload = json_encode([
-            'redirect_uri' => $redirectUri,
-            'ts' => time(),
-        ]);
+        $frontendUrl = rtrim((string) config('app.frontend_url'), '/');
 
-        $sig = hash_hmac('sha256', $payload, $this->getAppKey());
-
-        return rtrim(strtr(base64_encode($payload . '|' . $sig), '+/', '-_'), '=');
+        return redirect()->away($frontendUrl . '/auth/callback?code=' . urlencode($code));
     }
 
-    private function readRedirectState(?string $state): ?string
+    private function redirectOAuthError()
     {
-        if (! $state) {
-            return null;
-        }
+        $frontendUrl = rtrim((string) config('app.frontend_url'), '/');
 
-        $decoded = base64_decode(strtr($state, '-_', '+/'));
-        if (! $decoded || ! str_contains($decoded, '|')) {
-            return null;
-        }
-
-        [$payload, $sig] = explode('|', $decoded, 2);
-        $expected = hash_hmac('sha256', $payload, $this->getAppKey());
-        if (! hash_equals($expected, $sig)) {
-            return null;
-        }
-
-        $data = json_decode($payload, true);
-
-        return is_array($data) ? ($data['redirect_uri'] ?? null) : null;
-    }
-
-    private function getAppKey(): string
-    {
-        $key = config('app.key');
-        if (str_starts_with($key, 'base64:')) {
-            $key = base64_decode(substr($key, 7));
-        }
-
-        return $key;
+        return redirect()->away($frontendUrl . '/auth/callback?error=oauth_failed');
     }
 
     /**

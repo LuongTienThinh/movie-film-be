@@ -2,6 +2,9 @@
 
 namespace App\Services\FilmSources;
 
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
+
 class KkPhimSource implements FilmSourceInterface
 {
     protected $url = 'https://phimapi.com/v1/api/danh-sach/hoat-hinh';
@@ -9,9 +12,18 @@ class KkPhimSource implements FilmSourceInterface
 
     protected function getData(string $url): array
     {
-        $response = @file_get_contents($url);
+        try {
+            $response = Http::acceptJson()->timeout(10)->retry(2, 200)->get($url);
+            if (! $response->successful()) {
+                Log::warning('KkPhim request failed', ['url' => $url, 'status' => $response->status()]);
+                return [];
+            }
 
-        return json_decode($response, true) ?: [];
+            return $response->json() ?: [];
+        } catch (\Throwable $e) {
+            Log::warning('KkPhim request failed', ['url' => $url, 'message' => $e->getMessage()]);
+            return [];
+        }
     }
 
     public function getPagination(): array
@@ -34,9 +46,7 @@ class KkPhimSource implements FilmSourceInterface
 
         $items = $data['data']['items'] ?? [];
 
-        return array_map(function ($e) {
-            return $e['slug'] ?? null;
-        }, array_values($items));
+        return array_values(array_filter(array_column($items, 'slug')));
     }
 
     public function getDetail(string $slug): array
@@ -46,15 +56,4 @@ class KkPhimSource implements FilmSourceInterface
         return $this->getData($url);
     }
 
-    public function getStreamSource(string $episodeData, string $provider, ?string $server = null): array
-    {
-        // Not supported for kkphim adapter in this refactor — return empty structure
-        return [
-            'server' => null,
-            'type' => null,
-            'corsProxyRequired' => false,
-            'proxyHeaders' => null,
-            'url' => null,
-        ];
-    }
 }

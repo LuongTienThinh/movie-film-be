@@ -2,15 +2,27 @@
 
 namespace App\Services\FilmSources;
 
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
+
 class AnimapperSource implements FilmSourceInterface
 {
     protected $base = 'https://api.animapper.net/api/v1/metadata';
 
     protected function getData(string $url): array
     {
-        $response = @file_get_contents($url);
+        try {
+            $response = Http::acceptJson()->timeout(10)->retry(2, 200)->get($url);
+            if (! $response->successful()) {
+                Log::warning('Animapper request failed', ['url' => $url, 'status' => $response->status()]);
+                return [];
+            }
 
-        return json_decode($response, true) ?: [];
+            return $response->json() ?: [];
+        } catch (\Throwable $e) {
+            Log::warning('Animapper request failed', ['url' => $url, 'message' => $e->getMessage()]);
+            return [];
+        }
     }
 
     public function getPagination(): array

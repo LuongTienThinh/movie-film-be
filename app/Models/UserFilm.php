@@ -14,8 +14,13 @@ class UserFilm extends Model
     protected $fillable = [
         'user_id',
         'film_id',
-        'is_view',
+        'views',
         'is_follow',
+    ];
+
+    protected $casts = [
+        'views' => 'integer',
+        'is_follow' => 'boolean',
     ];
 
     public function user()

@@ -2,19 +2,15 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Episode;
 use App\Models\Film;
-use App\Models\User;
 use App\Models\UserFilm;
 use App\Traits\FilmTrait;
 use App\Traits\ApiResponseTrait;
 use Exception;
-use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\Request;
 use App\Http\Requests\FilmRequest;
 use Carbon\Carbon;
-use DB;
+use Illuminate\Support\Facades\Log;
 
 class FilmController extends Controller
 {
@@ -75,12 +71,22 @@ class FilmController extends Controller
 
     public function getFilmDetail(Request $request)
     {
+        $validated = $request->validate([
+            'id' => ['required', 'integer', 'min:1'],
+            'slug' => ['required', 'string', 'max:255'],
+        ]);
+
         try {
             $film = Film::query()
-                ->where("id", '=', $request->id)
-                ->where("slug", '=', $request->slug)
+                ->with(['status', 'type', 'genres', 'countries', 'episodes'])
+                ->where("id", $validated['id'])
+                ->where("slug", $validated['slug'])
                 ->where('is_delete', 0)
                 ->first();
+
+            if (! $film) {
+                return $this->errorResponse(404, 'Film not found.');
+            }
 
             $data = $this->formatFilm($film, [
                 "status"        => $film->status->name,
@@ -91,8 +97,9 @@ class FilmController extends Controller
             ]);
 
             return $this->successResponse($data, 200, "Get film detail success.");
-        } catch (Exception $e) {
-            return $this->errorResponse(500, $e->getMessage());
+        } catch (\Throwable $e) {
+            Log::error('Unable to load film detail', ['exception' => $e]);
+            return $this->errorResponse(500, 'Unable to load film detail.');
         }
     }
 
@@ -104,7 +111,10 @@ class FilmController extends Controller
             'q'       => 'nullable|string',
             'type'    => 'nullable|string',
             'genre'   => 'nullable|string|exists:genres,slug',
+            'country' => 'nullable|string|exists:countries,slug',
             'year'    => 'nullable|integer|min:1900|max:2100',
+            'sort'    => 'nullable|in:updated_at,year,name,views',
+            'order'   => 'nullable|in:asc,desc',
         ]);
 
         try {
@@ -147,8 +157,9 @@ class FilmController extends Controller
             $data = $this->getApiFilm($request, $films);
 
             return $this->successResponse($data, 200, "Get latest films success.");
-        } catch (Exception $e) {
-            return $this->errorResponse(500, $e->getMessage(). ' at ' . $e->getFile() . ' line ' . $e->getLine());
+        } catch (\Throwable $e) {
+            Log::error('Unable to load latest films', ['exception' => $e]);
+            return $this->errorResponse(500, 'Unable to load latest films.');
         }
     }
 
@@ -240,16 +251,16 @@ class FilmController extends Controller
         }
     }
 
-    public function getWishlistByUserID(Request $request, $userId)
+    public function getWishlistByUserID(Request $request)
     {
         try {
-            $films = User::find($userId)
+            $films = $request->user()
                 ->films()
                 ->getQuery()
-                ->select('films.id as id', 'films.*', 'is_follow', 'views')
+                ->select('films.id as id', 'films.*', 'user_film.is_follow', 'user_film.views')
                 ->where(function ($query) {
-                    $query->where('is_follow', '=', true)
-                            ->orWhere('views', '>', 0);
+                    $query->where('user_film.is_follow', true)
+                        ->orWhere('user_film.views', '>', 0);
                 });
                                         
             $data = $this->getApiFilm($request, $films, 'user_film');
@@ -260,14 +271,14 @@ class FilmController extends Controller
         }
     }
 
-    public function getWishlistFollowByUserID(Request $request, $userId)
+    public function getWishlistFollowByUserID(Request $request)
     {
         try {
-            $films = User::find($userId)
+            $films = $request->user()
                 ->films()
                 ->getQuery()
-                ->select('films.id as id', 'films.*', 'is_follow', 'views')
-                ->where('is_follow', '=', true);
+                ->select('films.id as id', 'films.*', 'user_film.is_follow', 'user_film.views')
+                ->where('user_film.is_follow', true);
 
             $data = $this->getApiFilm($request, $films, 'user_film');
 
@@ -277,14 +288,14 @@ class FilmController extends Controller
         }
     }
 
-    public function getWishlistViewedByUserID(Request $request, $userId)
+    public function getWishlistViewedByUserID(Request $request)
     {
         try {
-            $films = User::find($userId)
+            $films = $request->user()
                 ->films()
                 ->getQuery()
-                ->select('films.id as id', 'films.*', 'is_follow', 'views')
-                ->where('views', '>', 0);
+                ->select('films.id as id', 'films.*', 'user_film.is_follow', 'user_film.views')
+                ->where('user_film.views', '>', 0);
 
             $data = $this->getApiFilm($request, $films, 'user_film', 'views');
 
@@ -294,25 +305,22 @@ class FilmController extends Controller
         }
     }
 
-    public function getWishlistDetailByUserID(Request $request, $userId, $filmId)
+    public function getWishlistDetailByUserID(Request $request, int $filmId)
     {
         try {
-            $userFilm = UserFilm::query()->where('user_id', $userId)->where('film_id', $filmId)->first();
-            
-            if (!$userFilm) {
-                $userFilm = UserFilm::create([
-                    'user_id'   => $userId,
-                    'film_id'   => $filmId,
-                    'is_follow' => false,
-                    'views'     => 0,
-                ]);
+            $film = Film::query()
+                ->with(['status', 'type', 'genres', 'countries', 'episodes'])
+                ->where('films.id', $filmId)
+                ->where('films.is_delete', 0)
+                ->first();
+
+            if (! $film) {
+                return $this->errorResponse(404, 'Film not found.');
             }
 
-            $film = User::find($userId)
-                ->films()
-                ->select('films.id as id', 'films.*', 'is_follow', 'views')
-                ->where('user_film.film_id', '=', $filmId)
-                ->where('films.is_delete', 0)
+            $userFilm = UserFilm::query()
+                ->where('user_id', $request->user()->id)
+                ->where('film_id', $filmId)
                 ->first();
 
             $data = $this->formatFilm($film, [
@@ -320,7 +328,10 @@ class FilmController extends Controller
                 "type"          => $film->type->name,
                 "genres"        => $film->genres->makeHidden('pivot'),
                 "countries"     => $film->countries->makeHidden('pivot'),
-                "episodes"      => $film->episodes
+                "episodes"      => $film->episodes,
+                "is_follow"     => (bool) ($userFilm?->is_follow ?? false),
+                "is_view"       => (int) ($userFilm?->views ?? 0) > 0,
+                "views"         => (int) ($userFilm?->views ?? 0),
             ]);
 
             return $this->successResponse($data, 200, "Get film detail success.");
@@ -349,9 +360,9 @@ class FilmController extends Controller
         }
     }
 
-    public function getUpdatedFilmsByUser(Request $request, int $userId) {
+    public function getUpdatedFilmsByUser(Request $request) {
         try {
-            $films = User::find($userId)
+            $films = $request->user()
                 ->films()
                 ->getQuery()
                 ->select(
@@ -360,9 +371,9 @@ class FilmController extends Controller
                     'films.slug',
                     'films.poster_url',
                 )
-                ->whereBetween('films.updated_at', [Carbon::today(), Carbon::now()])
-                ->orWhere(function ($query) {
-                    $query->where('is_follow', '=', true);
+                ->where(function ($query) {
+                    $query->whereBetween('films.updated_at', [Carbon::today(), Carbon::now()])
+                        ->orWhere('user_film.is_follow', true);
                 });
 
             $data = $this->getApiFilm($request, $films, 'user_film', 'is_follow');
@@ -373,33 +384,37 @@ class FilmController extends Controller
         }
     }
 
-    public function saveUserFilm(Request $request, int $userId, int $filmId)
+    public function saveUserFilm(Request $request, int $filmId)
     {
-        try {
-            $viewed = filter_var($request->viewed, FILTER_VALIDATE_BOOLEAN);
-            $followed = filter_var($request->followed, FILTER_VALIDATE_BOOLEAN);
+        $validated = $request->validate([
+            'viewed' => ['sometimes', 'boolean'],
+            'followed' => ['sometimes', 'boolean'],
+        ]);
 
-            $film = Film::find($filmId);
+        try {
+            $film = Film::query()->where('is_delete', 0)->find($filmId);
 
             if (!$film) {
                 return $this->errorResponse(404, "Film not found.");
             }
 
-            $film->users()->syncWithoutDetaching($userId);
-
-            $userFilm = UserFilm::firstOrNew([
-                'user_id' => $userId,
+            $userFilm = UserFilm::query()->firstOrCreate([
+                'user_id' => $request->user()->id,
                 'film_id' => $filmId,
+            ], [
+                'views' => 0,
+                'is_follow' => false,
             ]);
 
-            if (isset($viewed) && $viewed) {
-                $userFilm->views += 1;
+            if (($validated['viewed'] ?? false) === true) {
+                $userFilm->increment('views');
             }
 
-            if (isset($followed)) {
-                $userFilm->is_follow = $followed;
+            if (array_key_exists('followed', $validated)) {
+                $userFilm->update(['is_follow' => $validated['followed']]);
             }
-            $userFilm->save();
+
+            $userFilm->refresh();
 
             return $this->successResponse($userFilm, 200, "Save user film success.");
         } catch (Exception $e) {

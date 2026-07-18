@@ -24,12 +24,4 @@ interface FilmSourceInterface
      */
     public function getDetail(string $slug): array;
 
-    /**
-     * Return stream/source info for a given episodeData and provider/server
-     * @param string $episodeData
-     * @param string $provider
-     * @param string|null $server
-     * @return array
-     */
-    public function getStreamSource(string $episodeData, string $provider, ?string $server = null): array;
 }

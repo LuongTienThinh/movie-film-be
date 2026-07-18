@@ -36,6 +36,8 @@ class User extends Authenticatable
     protected $hidden = [
         'password',
         'remember_token',
+        'google_id',
+        'facebook_id',
     ];
 
     /**
@@ -50,6 +52,8 @@ class User extends Authenticatable
     
     public function films()
     {
-        return $this->belongsToMany(Film::class, 'user_film', 'user_id', 'film_id');
+        return $this->belongsToMany(Film::class, 'user_film', 'user_id', 'film_id')
+            ->withPivot(['views', 'is_follow'])
+            ->withTimestamps();
     }
 }

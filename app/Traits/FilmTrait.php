@@ -14,8 +14,6 @@ trait FilmTrait
 {
     public function applyFilmFilters(Builder $films, Request $request): Builder
     {
-        // $films->where('server', '!=', 'kkphim');
-        
         if ($request->filled('q')) {
             $q = trim($request->q);
             if ($q !== '') {
@@ -33,6 +31,8 @@ trait FilmTrait
 
                 if ($typeId) {
                     $films->where('films.type_id', $typeId);
+                } else {
+                    $films->whereRaw('1 = 0');
                 }
             }
         }
@@ -44,6 +44,12 @@ trait FilmTrait
         if ($request->filled('genre')) {
             $films->whereHas('genres', function ($query) use ($request) {
                 $query->where('genres.slug', $request->genre);
+            });
+        }
+
+        if ($request->filled('country')) {
+            $films->whereHas('countries', function ($query) use ($request) {
+                $query->where('countries.slug', $request->country);
             });
         }
 
@@ -60,7 +66,12 @@ trait FilmTrait
                 $query->where('views', '>', 0);
             }], 'views');
         
-        if ($tableName != '') {
+        if ($request->filled('sort')) {
+            $sort = $request->string('sort')->toString();
+            $direction = $request->string('order')->lower()->toString() === 'asc' ? 'asc' : 'desc';
+            $column = $sort === 'views' ? 'views' : 'films.' . $sort;
+            $listFilms = $listFilms->orderBy($column, $direction)->orderByDesc('films.id');
+        } elseif ($tableName != '') {
             $listFilms = $listFilms->orderByDesc("$tableName.$order")->orderByDesc("$tableName.updated_at");
         } else {
             $listFilms = $listFilms->orderByDesc($order);
