@@ -32,7 +32,7 @@ class AuthRequest extends FormRequest
     {
         if ($this->route() && $this->route()->named('api_login')) {
             return [
-                'email' => 'required|email|max:255|unique:users,email',
+                'email' => 'required|email|max:255',
                 'password' => 'required|string',
             ];
         }
@@ -40,7 +40,7 @@ class AuthRequest extends FormRequest
         if ($this->route() && $this->route()->named('api_sign-up')) {
             return [
                 'name' => 'required|string|max:255',
-                'email' => 'required|email',
+                'email' => 'required|email|max:255|unique:users,email',
                 'phone' => 'sometimes|nullable|string|max:20',
                 'gender' => 'sometimes|nullable|string|max:20',
                 'date_of_birth' => 'sometimes|nullable|date',
