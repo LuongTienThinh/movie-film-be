@@ -43,6 +43,13 @@ return [
         ],
     ],
     [
+        'title' => 'messages.user.management',
+        'url' => 'admin.users.index',
+        'active' => ['admin.users.*'],
+        'type' => 'menu-item',
+        'icon' => 'icons.user',
+    ],
+    [
         'title' => 'messages.general.information',
         'url' => 'admin.system.info',
         'active' => ['admin.system.*'],

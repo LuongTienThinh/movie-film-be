@@ -22,10 +22,10 @@
             <span>Quốc gia</span>
             <strong>{{ number_format($stats['countries']) }}</strong>
         </a>
-        <div class="admin-stat">
+        <a class="admin-stat" href="{{ route('admin.users.index') }}">
             <span>Người dùng</span>
             <strong>{{ number_format($stats['users']) }}</strong>
-        </div>
+        </a>
     </div>
 
     <section class="admin-panel">

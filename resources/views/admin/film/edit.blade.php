@@ -7,7 +7,7 @@
     <div class="d-flex justify-content-between align-items-center">
         <h2>{{ __('messages.film.management.detail') }}</h2>
     </div>
-    <form action="{{ route('admin.film.update', ['id' => $film->id]) }}" method="post" autocomplete="off" enctype="multipart/form-data">
+    <form class="film-form" action="{{ route('admin.film.update', ['id' => $film->id]) }}" method="post" autocomplete="off" enctype="multipart/form-data">
         @csrf
         @method('PUT')
         <div class="film-detail row">
@@ -142,7 +142,7 @@
                                 <img src="{{ $posterUrl }}" alt="poster">
                             </div>
                             <div class="d-flex gap-2">
-                                <label class="file-change">Change
+                                <label class="file-change">{{ __('messages.change') }}
                                     <input type="file" name="poster" class="file-input" accept="image/*">
                                 </label>
                             </div>
@@ -165,7 +165,7 @@
                                 <img src="{{ $film->thumbnail_url }}" alt="thumbnail">
                             </div>
                             <div class="d-flex gap-2">
-                                <label class="file-change">Change
+                                <label class="file-change">{{ __('messages.change') }}
                                     <input type="file" name="thumbnail" class="file-input" accept="image/*">
                                 </label>
                             </div>
@@ -187,22 +187,17 @@
         <div class="section-split">@include('icons.split')</div>
 
         <div class="form-section">
-            <div class="form-group row">
-                <div class="col-3"></div>
-                <div class="col-9">
-                    <h5>{{ __('messages.film.sections.description') }}</h5>
-                </div>
-            </div>
+            <h5>{{ __('messages.film.sections.description') }}</h5>
             <div class="form-group row">
                 <label class="col-3" for="description">{{ __('messages.film.description') }}</label>
                 <div class="col-9">
-                    <textarea name="description" id="description" rows="6">{{ $film->description }}</textarea>
+                    <textarea name="description" id="description" rows="6">{{ old('description', $film->description) }}</textarea>
                 </div>
             </div>
         </div>
 
         <div class="form-section">
-            <h5>{{ __('messages.genres') ?? 'Genres' }}</h5>
+            <h5>{{ __('messages.genres') }}</h5>
             <div class="form-group row">
                 <label class="col-3" for="genres"></label>
                 <div class="col-9">
@@ -240,7 +235,7 @@
         </div>
 
         <div class="form-section">
-            <h5>{{ __('messages.episodes') ?? 'Tập phim' }}</h5>
+            <h5>{{ __('messages.film.sections.episodes') }}</h5>
             <div class="form-group row">
                 <label class="col-3" for="episodes"></label>
                 <div class="col-9">
@@ -265,8 +260,8 @@
                                 $linkVal = $epLinks[$i] ?? '';
                             @endphp
                             <div class="episode-row d-flex gap-2 mb-2 align-items-center">
-                                <input type="text" name="episode_name[]" class="episode-name text-center" style="width:120px; text-align:center;" value="{{ $nameVal }}">
-                                <input type="text" name="episode_link[]" class="episode-link" value="{{ $linkVal }}" placeholder="{{ __('messages.placeholder.link') ?? 'Link embedded' }}">
+                                <input type="text" name="episode_name[]" class="episode-name text-center" value="{{ $nameVal }}" placeholder="{{ __('messages.film.episode_name') }}">
+                                <input type="text" name="episode_link[]" class="episode-link" value="{{ $linkVal }}" placeholder="{{ __('messages.placeholder.link') }}">
                                 <div class="episode-actions">
                                     @if($i === $rows - 1)
                                         <button type="button" class="btn btn-sm btn-add">@include('icons.tick')</button>
@@ -287,7 +282,6 @@
             <div class="col-9">
                 <button class="btn btn-primary">{{ __('messages.film.edit.button') }}</button>
             </div>
-        </div>
         </div>
     </form>
 </div>

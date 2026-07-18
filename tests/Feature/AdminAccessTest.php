@@ -20,4 +20,11 @@ class AdminAccessTest extends TestCase
         $response->assertOk();
         $response->assertViewIs('admin.login');
     }
+
+    public function test_guest_cannot_access_user_management(): void
+    {
+        $response = $this->get(route('admin.users.index'));
+
+        $response->assertRedirect(route('login'));
+    }
 }

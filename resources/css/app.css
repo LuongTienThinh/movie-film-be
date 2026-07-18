@@ -190,10 +190,6 @@ aside.sidebar a:hover {
     background: transparent;
 }
 
-aside.sidebar .menu-item .child > a.active {
-    font-weight: 700;
-}
-
 main.main-content {
     margin-left: calc(var(--sidebar-width) + 1px);
     color: var(--text-color);
@@ -256,6 +252,13 @@ input#search {
     border-radius: 5px;
     padding: 0 8px;
     height: 24px;
+    color: var(--main-color);
+    background: transparent;
+}
+
+.pagination button.btn-pgn:hover {
+    color: var(--text-color);
+    background: var(--main-color);
 }
 
 .pagination .btn-pgn.active {
@@ -269,43 +272,65 @@ input#search {
     width: 28px;
 }
 
-.film-detail form {
+.pagination #to-custom-page {
+    color: var(--main-color);
+    background: transparent;
+}
+
+.film-form {
     display: flex;
     flex-direction: column;
     gap: 10px;
 }
 
-/* restore vertical spacing between form groups inside film forms */
-.film-detail .form-group {
+/* Keep all film fields visually consistent, including sections outside .film-detail. */
+.film-form .form-group {
     margin-bottom: 12px;
 }
 
-.film-detail label {
+.film-form label {
     align-content: center;
 }
 
-.film-detail label.require::after {
+.film-form label.require::after {
     content: " *";
     color: #FF0000;
 }
 
-.film-detail input {
-    border-radius: var(--input-border-radius);
-    padding: var(--input-padding);
-}
-
-/* Make textarea/select/input match input appearance inside film forms */
-.film-detail textarea,
-.film-detail select {
+.film-form input:not([type="file"]):not([type="hidden"]):not(.search-input),
+.film-form textarea,
+.film-form select {
+    min-height: 44px;
     background-color: var(--input-color);
     color: var(--text-color);
-    border: none;
+    border: 1px solid transparent;
     border-radius: var(--input-border-radius);
     padding: var(--input-padding);
     box-shadow: none;
+    font: inherit;
 }
 
-.film-detail textarea { resize: vertical; }
+.film-form input:not([type="file"]):not([type="hidden"]):not(.search-input):focus,
+.film-form textarea:focus,
+.film-form select:focus {
+    border-color: var(--main-color);
+    outline: none;
+}
+
+.film-form textarea {
+    width: 100%;
+    min-height: 140px;
+    resize: vertical;
+}
+
+.film-form textarea::placeholder {
+    color: var(--text-placeholder-color);
+}
+
+.film-form .episode-name {
+    width: 120px;
+    flex: 0 0 120px;
+}
 
 /* Episode actions container */
 .episode-actions {
@@ -540,7 +565,9 @@ input#search {
 }
 
 .admin-search-form input,
+.admin-search-form select,
 .admin-form-shell .form-control,
+.admin-user-form .form-select,
 .admin-login-panel .form-control {
     min-height: 42px;
     padding: 8px 12px;
@@ -548,6 +575,35 @@ input#search {
     border: 1px solid rgba(255,255,255,0.12);
     border-radius: 6px;
     background: var(--input-color);
+}
+
+.admin-select-field {
+    min-width: 170px;
+}
+
+.admin-user-form .form-select:focus,
+.admin-search-form select:focus {
+    border-color: var(--main-color);
+    box-shadow: none;
+}
+
+.admin-role-badge {
+    display: inline-flex;
+    min-width: 62px;
+    justify-content: center;
+    padding: 4px 8px;
+    border: 1px solid rgba(255,255,255,0.14);
+    border-radius: 5px;
+    color: var(--text-color);
+    background: rgba(255,255,255,0.04);
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+
+.admin-role-badge--admin {
+    color: #cff6f5;
+    border-color: rgba(23,184,189,0.45);
+    background: rgba(23,184,189,0.12);
 }
 
 .admin-search-form input {

@@ -7,6 +7,7 @@ use App\Http\Controllers\Admin\CountryController;
 use App\Http\Controllers\Admin\FilmController;
 use App\Http\Controllers\Admin\GenreController;
 use App\Http\Controllers\Admin\SystemController;
+use App\Http\Controllers\Admin\UserController;
 
 /*
 |--------------------------------------------------------------------------
@@ -60,5 +61,9 @@ Route::domain(env('ADMIN_DOMAIN'))->group(function () {
 
         Route::get('/system-information', [SystemController::class, 'index'])
             ->name('admin.system.info');
+
+        Route::get('/users', [UserController::class, 'index'])->name('admin.users.index');
+        Route::get('/users/{id}/edit', [UserController::class, 'edit'])->name('admin.users.edit');
+        Route::put('/users/{id}', [UserController::class, 'update'])->name('admin.users.update');
     });
 });
