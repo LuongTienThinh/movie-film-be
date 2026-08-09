@@ -22,7 +22,7 @@ class SyncFilmsToMeili extends Command
         $index = $client->index('films');
 
         if ($this->option('fresh')) {
-            $this->info('🔄 Reset index films');
+            $this->info('Reset index films');
             $client->deleteIndex('films');
             $client->createIndex('films', ['primaryKey' => 'id']);
             $index = $client->index('films');
@@ -61,6 +61,6 @@ class SyncFilmsToMeili extends Command
                 $index->addDocuments($docs);
             });
 
-        $this->info('✅ Sync films to Meilisearch done');
+        $this->info('Sync films to Meilisearch done');
     }
 }

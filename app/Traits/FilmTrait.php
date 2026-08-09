@@ -87,32 +87,161 @@ trait FilmTrait
     }
 
     public function distinctSlug(Builder $films) {
-        $films = $films->joinSub(
-            DB::table('films')
-                ->selectRaw('slug, MAX(updated_at) AS updated_at, MIN(id) as id')
-                ->groupBy('slug'),
-            'latest_films',
-            function ($join) {
-                $join->on('films.slug', '=', 'latest_films.slug')
-                    ->whereColumn('films.updated_at', '=', 'latest_films.updated_at');
-            }
-        );
+        // $films = $films->joinSub(
+        //     DB::table('films')
+        //         ->selectRaw('slug, MAX(updated_at) AS updated_at, MIN(id) as id')
+        //         ->groupBy('slug'),
+        //     'latest_films',
+        //     function ($join) {
+        //         $join->on('films.slug', '=', 'latest_films.slug')
+        //             ->whereColumn('films.updated_at', '=', 'latest_films.updated_at');
+        //     }
+        // );
 
         return $films;
     }
 
 
+    public function batchResolveCloudAssets($listFilm)
+    {
+        $collection = $listFilm instanceof Collection ? $listFilm : collect($listFilm);
+
+        if ($collection->isEmpty()) {
+            return $listFilm;
+        }
+
+        $filmIds = $collection->pluck('id')->filter()->unique()->toArray();
+        $episodeIds = [];
+
+        foreach ($collection as $film) {
+            if (is_object($film) && method_exists($film, 'relationLoaded') && $film->relationLoaded('episodes') && $film->episodes) {
+                foreach ($film->episodes as $episode) {
+                    if (isset($episode->id)) {
+                        $episodeIds[] = $episode->id;
+                    }
+                }
+            }
+        }
+
+        $cloudAssets = DB::table('cloud_assets')
+            ->where('status', 'success')
+            ->whereNotNull('storage_url')
+            ->where('storage_url', '!=', '')
+            ->where(function ($query) use ($filmIds, $episodeIds) {
+                if (! empty($filmIds)) {
+                    $query->orWhere(function ($q) use ($filmIds) {
+                        $q->whereIn('resource_type', ['film_thumbnail', 'film_poster', 'film_trailer'])
+                          ->whereIn('resource_type_id', $filmIds);
+                    });
+                }
+                if (! empty($episodeIds)) {
+                    $query->orWhere(function ($q) use ($episodeIds) {
+                        $q->where('resource_type', 'episode')
+                          ->whereIn('resource_type_id', $episodeIds);
+                    });
+                }
+            })
+            ->get(['resource_type', 'resource_type_id', 'storage_url']);
+
+        $assetMap = [];
+        foreach ($cloudAssets as $asset) {
+            $key = "{$asset->resource_type}_{$asset->resource_type_id}";
+            $assetMap[$key] = $this->formatCloudAssetUrl($asset->resource_type, $asset->storage_url);
+        }
+
+        foreach ($collection as $film) {
+            if (! is_object($film)) {
+                continue;
+            }
+
+            $posterKey = "film_poster_{$film->id}";
+            if (isset($assetMap[$posterKey]) && $assetMap[$posterKey] !== '') {
+                $film->poster_url = $assetMap[$posterKey];
+            }
+
+            $thumbKey = "film_thumbnail_{$film->id}";
+            if (isset($assetMap[$thumbKey]) && $assetMap[$thumbKey] !== '') {
+                $film->thumbnail_url = $assetMap[$thumbKey];
+            }
+
+            $trailerKey = "film_trailer_{$film->id}";
+            if (isset($assetMap[$trailerKey]) && $assetMap[$trailerKey] !== '') {
+                $film->trailer_url = $assetMap[$trailerKey];
+            }
+
+            if (method_exists($film, 'relationLoaded') && $film->relationLoaded('episodes') && $film->episodes) {
+                foreach ($film->episodes as $episode) {
+                    $epKey = "episode_{$episode->id}";
+                    if (isset($assetMap[$epKey]) && $assetMap[$epKey] !== '') {
+                        $episode->link = $assetMap[$epKey];
+                    }
+                }
+            }
+        }
+
+        return $listFilm;
+    }
+
+    public function resolveSingleFilmCloudAssets(Film $film, array &$fields = []): Film
+    {
+        $this->batchResolveCloudAssets(collect([$film]));
+
+        if (isset($fields['episodes'])) {
+            $episodes = $fields['episodes'];
+            $epIds = [];
+
+            if (is_iterable($episodes)) {
+                foreach ($episodes as $ep) {
+                    $id = is_object($ep) ? ($ep->id ?? null) : ($ep['id'] ?? null);
+                    if ($id) {
+                        $epIds[] = $id;
+                    }
+                }
+            }
+
+            if (! empty($epIds)) {
+                $epAssets = DB::table('cloud_assets')
+                    ->where('resource_type', 'episode')
+                    ->whereIn('resource_type_id', $epIds)
+                    ->where('status', 'success')
+                    ->whereNotNull('storage_url')
+                    ->where('storage_url', '!=', '')
+                    ->pluck('storage_url', 'resource_type_id');
+
+                if ($epAssets->isNotEmpty()) {
+                    if (is_iterable($episodes)) {
+                        foreach ($episodes as $idx => $ep) {
+                            $id = is_object($ep) ? ($ep->id ?? null) : ($ep['id'] ?? null);
+                            if ($id && isset($epAssets[$id])) {
+                                if (is_object($ep)) {
+                                    $ep->link = $epAssets[$id];
+                                } else {
+                                    $fields['episodes'][$idx]['link'] = $epAssets[$id];
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        return $film;
+    }
+
     public function formatFilm(Film $film, array $fields = [])
     {
+        $this->resolveSingleFilmCloudAssets($film, $fields);
+
         $addFormat = [];
 
         $formatFields = [
             'is_view'           => 'boolean',
             'is_follow'         => 'boolean',
             'is_delete'         => 'boolean',
-            "episode_current"   => 'int',
-            "episode_total"     => 'int',
-            "year"              => 'int',
+            'episode_current'   => 'int',
+            'episode_total'     => 'int',
+            'year'              => 'int',
+            'server'            => 'string',
         ];
         
         foreach ($formatFields as $field => $type) {
@@ -133,20 +262,19 @@ trait FilmTrait
 
         return [
             ...$film->toArray(),
-            // "status"        => $film->status->name,
-            // "type"          => $film->type->name,
-            // "genres"        => $film->genres->makeHidden('pivot'),
-            // "countries"     => $film->countries->makeHidden('pivot'),
-            // "episodes"      => $film->episodes,
             "description"   => strip_tags($film->description),
             ...$addFormat,
             ...$fields,
         ];
     }
 
-    public function formatListFilms(Collection $listFilm)
+    public function formatListFilms($listFilm)
     {
-        return $listFilm->map(function ($film, $index) {
+        $listFilm = $this->batchResolveCloudAssets($listFilm);
+
+        $collection = $listFilm instanceof Collection ? $listFilm : collect($listFilm);
+
+        return $collection->map(function ($film, $index) {
             return $this->formatFilm($film);
         });
     }
@@ -178,5 +306,16 @@ trait FilmTrait
             "movie" => $data,
             "pagination" => $pagination
         ];
+    }
+
+    private function formatCloudAssetUrl(string $resourceType, string $url): string
+    {
+        if (in_array($resourceType, ['film_poster', 'film_thumbnail'], true)) {
+            if (preg_match('/(?:id=|\/d\/)([a-zA-Z0-9_-]+)/', $url, $matches)) {
+                return "https://lh3.googleusercontent.com/d/{$matches[1]}";
+            }
+        }
+
+        return $url;
     }
 }

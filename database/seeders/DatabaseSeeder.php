@@ -13,6 +13,8 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
+        \Illuminate\Support\Facades\Schema::disableForeignKeyConstraints();
+
         \App\Models\User::truncate();
 
         \App\Models\User::factory()->create([
@@ -26,5 +28,7 @@ class DatabaseSeeder extends Seeder
         $this->call(TypeSeeder::class);
         $this->call(StatusSeeder::class);
         // $this->call(FilmSeeder::class);
+
+        \Illuminate\Support\Facades\Schema::enableForeignKeyConstraints();
     }
 }

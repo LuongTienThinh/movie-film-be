@@ -37,6 +37,26 @@ return [
         'redirect' => env('GOOGLE_REDIRECT_URI'),
     ],
 
+    'google_drive' => [
+        'client_id' => env('GOOGLE_CLIENT_ID'),
+        'client_secret' => env('GOOGLE_CLIENT_SECRET'),
+        'redirect' => env('GOOGLE_DRIVE_REDIRECT_URI'),
+        'token_path' => env('GOOGLE_DRIVE_TOKEN_PATH', storage_path('app/private/google-drive-token.json')),
+        'folder_id' => env('GOOGLE_DRIVE_FOLDER_ID'),
+        'folders' => [
+            'posters' => env('GOOGLE_DRIVE_POSTERS_FOLDER_ID'),
+            'thumbnails' => env('GOOGLE_DRIVE_THUMBNAILS_FOLDER_ID'),
+            'video' => env('GOOGLE_DRIVE_VIDEO_FOLDER_ID'),
+        ],
+        'public' => env('GOOGLE_DRIVE_PUBLIC', false),
+        'chunk_size' => (int) env('GOOGLE_DRIVE_CHUNK_SIZE', 10 * 1024 * 1024),
+    ],
+
+    'cloud_assets' => [
+        'min_video_bytes' => (int) env('CLOUD_ASSET_MIN_VIDEO_BYTES', 512 * 1024),
+        'min_image_bytes' => (int) env('CLOUD_ASSET_MIN_IMAGE_BYTES', 1024),
+    ],
+
     'facebook' => [
         'client_id' => env('FACEBOOK_CLIENT_ID'),
         'client_secret' => env('FACEBOOK_CLIENT_SECRET'),

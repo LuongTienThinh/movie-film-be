@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\GoogleDriveOAuthController;
 use App\Http\Controllers\CountryController;
 use App\Http\Controllers\FilmController;
 use App\Http\Controllers\GenreController;
@@ -37,6 +38,8 @@ Route::domain(env('ADMIN_DOMAIN'))->group(function () {
         Route::middleware('web')->group(function () {
             Route::get('/google/redirect', [AuthController::class, 'googleRedirect'])->name('api_google_redirect');
             Route::get('/google/callback', [AuthController::class, 'googleCallback'])->name('api_google_callback');
+            Route::get('/cloud-drive/oauth/redirect', [GoogleDriveOAuthController::class, 'redirect'])->name('cloud_drive.oauth.redirect');
+            Route::get('/cloud-drive/oauth/callback', [GoogleDriveOAuthController::class, 'callback'])->name('cloud_drive.oauth.callback');
             Route::get('/facebook/redirect', [AuthController::class, 'facebookRedirect'])->name('api_facebook_redirect');
             Route::get('/facebook/callback', [AuthController::class, 'facebookCallback'])->name('api_facebook_callback');
         });

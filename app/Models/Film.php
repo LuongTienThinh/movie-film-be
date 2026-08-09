@@ -15,7 +15,7 @@ class Film extends Model
     use FullTextSearchTrait;
 
     protected $hidden = [
-        'server',
+        // 'server',
         'trailer_url',
         'type_id',
         'status_id',

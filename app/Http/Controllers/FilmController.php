@@ -128,6 +128,7 @@ class FilmController extends Controller
                 'films.poster_url',
                 'films.episode_current',
                 'films.quality',
+                'films.server',
             )->with('genres');
 
             $data = $this->getApiFilm($request, $films);
@@ -152,6 +153,7 @@ class FilmController extends Controller
                 'films.episode_current',
                 'films.quality',
                 'films.year',
+                'films.server',
             )->with("genres");
 
             $data = $this->getApiFilm($request, $films);
@@ -173,6 +175,7 @@ class FilmController extends Controller
                 'films.slug',
                 'films.thumbnail_url',
                 'films.poster_url',
+                'films.server',
             )->where("type_id", "=", 2);
 
             $data = $this->getApiFilm($request, $films);
@@ -193,6 +196,7 @@ class FilmController extends Controller
                 'films.slug',
                 'films.thumbnail_url',
                 'films.poster_url',
+                'films.server',
             )->where("type_id", "=", 1);
 
             $data = $this->getApiFilm($request, $films);
@@ -207,9 +211,11 @@ class FilmController extends Controller
     {
         try {
             $searchFilms = $this->distinctSlug(Film::fullTextSearch(["name", "origin_name"], $request->search))->where('is_delete', 0);
-            \Log::info($searchFilms->toSql());
+            Log::info($searchFilms->toSql());
 
-            return $this->successResponse($searchFilms->get(), 200, "Get search films success.");
+            $data = $this->formatListFilms($searchFilms->get());
+
+            return $this->successResponse($data, 200, "Get search films success.");
         } catch (Exception $e) {
             return $this->errorResponse(500, $e->getMessage());
         }
@@ -350,6 +356,7 @@ class FilmController extends Controller
                 'films.slug',
                 'films.thumbnail_url',
                 'films.poster_url',
+                'films.server',
             );
 
             $data = $this->getApiFilm($request, $films, '', 'views');
@@ -370,6 +377,7 @@ class FilmController extends Controller
                     'films.name',
                     'films.slug',
                     'films.poster_url',
+                    'films.server',
                 )
                 ->where(function ($query) {
                     $query->whereBetween('films.updated_at', [Carbon::today(), Carbon::now()])
